@@ -5,7 +5,7 @@ import com.ninedata.dbbench.config.DatabaseConfig;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
 import com.ninedata.dbbench.metrics.MetricsSnapshot;
-import com.ninedata.dbbench.metrics.OSMetricsCollector;
+import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -23,7 +23,7 @@ class MetricsControllerTest {
 
     private MetricsController controller;
     private MetricsRegistry metricsRegistry;
-    private OSMetricsCollector osMetricsCollector;
+    private ClientMetricsCollector clientMetricsCollector;
     private BenchmarkEngine engine;
 
     @BeforeEach
@@ -31,10 +31,10 @@ class MetricsControllerTest {
         DatabaseConfig dbConfig = new DatabaseConfig();
         BenchmarkConfig benchConfig = new BenchmarkConfig();
         metricsRegistry = new MetricsRegistry();
-        osMetricsCollector = new OSMetricsCollector();
-        osMetricsCollector.init();
-        engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, osMetricsCollector);
-        controller = new MetricsController(metricsRegistry, osMetricsCollector, engine);
+        clientMetricsCollector = new ClientMetricsCollector();
+        clientMetricsCollector.init();
+        engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
+        controller = new MetricsController(metricsRegistry, clientMetricsCollector, engine);
     }
 
     @Test
@@ -45,7 +45,7 @@ class MetricsControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().containsKey("transaction"));
-        assertTrue(response.getBody().containsKey("os"));
+        assertTrue(response.getBody().containsKey("client"));
         assertTrue(response.getBody().containsKey("status"));
         assertTrue(response.getBody().containsKey("running"));
         assertTrue(response.getBody().containsKey("loading"));
@@ -129,16 +129,16 @@ class MetricsControllerTest {
     }
 
     @Test
-    @DisplayName("Current metrics should include OS metrics")
-    void testCurrentIncludesOsMetrics() {
+    @DisplayName("Current metrics should include client metrics")
+    void testCurrentIncludesClientMetrics() {
         ResponseEntity<Map<String, Object>> response = controller.current();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> osMetrics = (Map<String, Object>) response.getBody().get("os");
+        Map<String, Object> clientMetrics = (Map<String, Object>) response.getBody().get("client");
 
-        assertNotNull(osMetrics);
-        assertTrue(osMetrics.containsKey("cpuUsage"));
-        assertTrue(osMetrics.containsKey("memoryUsage"));
+        assertNotNull(clientMetrics);
+        assertTrue(clientMetrics.containsKey("cpuUsage"));
+        assertTrue(clientMetrics.containsKey("memoryUsage"));
     }
 
     @Test

@@ -12,9 +12,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Collects metrics from the client machine (where dbbench is running).
+ * Uses OSHI library for CPU, memory, disk I/O, and network I/O.
+ */
 @Slf4j
 @Component
-public class OSMetricsCollector {
+public class ClientMetricsCollector {
     private final SystemInfo systemInfo;
     private final CentralProcessor processor;
     private final GlobalMemory memory;
@@ -31,7 +35,7 @@ public class OSMetricsCollector {
     // Cache the list of valid network interface names
     private List<String> validNetworkInterfaces = new ArrayList<>();
 
-    public OSMetricsCollector() {
+    public ClientMetricsCollector() {
         this.systemInfo = new SystemInfo();
         this.processor = systemInfo.getHardware().getProcessor();
         this.memory = systemInfo.getHardware().getMemory();
@@ -39,7 +43,6 @@ public class OSMetricsCollector {
         this.prevTicks = processor.getSystemCpuLoadTicks();
         this.prevTimestamp = System.currentTimeMillis();
     }
-
     @PostConstruct
     public void init() {
         // Detect and cache valid network interfaces
@@ -94,7 +97,6 @@ public class OSMetricsCollector {
             }
         }
     }
-
     private void initPreviousValues() {
         try {
             for (NetworkIF net : systemInfo.getHardware().getNetworkIFs()) {
@@ -140,7 +142,6 @@ public class OSMetricsCollector {
             VirtualMemory vm = memory.getVirtualMemory();
             metrics.put("swapTotal", vm.getSwapTotal() / (1024 * 1024));
             metrics.put("swapUsed", vm.getSwapUsed() / (1024 * 1024));
-
             // Load average
             double[] loadAverage = processor.getSystemLoadAverage(3);
             if (loadAverage[0] >= 0) {
@@ -201,7 +202,7 @@ public class OSMetricsCollector {
             prevTimestamp = currentTime;
 
         } catch (Exception e) {
-            log.warn("Error collecting OS metrics: {}", e.getMessage());
+            log.warn("Error collecting client metrics: {}", e.getMessage());
         }
 
         return metrics;

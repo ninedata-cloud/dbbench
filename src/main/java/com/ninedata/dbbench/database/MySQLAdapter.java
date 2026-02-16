@@ -23,6 +23,45 @@ public class MySQLAdapter extends AbstractDatabaseAdapter {
     }
 
     @Override
+    public boolean supportsCsvLoad() {
+        return true;
+    }
+
+    @Override
+    public void loadCsvFile(String tableName, String csvFilePath, String[] columns) throws SQLException {
+        String columnList = String.join(", ", columns);
+        String sql = "LOAD DATA LOCAL INFILE '" + csvFilePath.replace("\\", "\\\\") + "' " +
+                "INTO TABLE " + tableName + " " +
+                "FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"' " +
+                "LINES TERMINATED BY '\\n' " +
+                "(" + columnList + ")";
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+            conn.commit();
+        }
+    }
+
+    @Override
+    public void initialize() throws SQLException {
+        // Ensure allowLoadLocalInfile is set for LOAD DATA LOCAL INFILE (client side)
+        String jdbcUrl = config.getJdbcUrl();
+        if (!jdbcUrl.contains("allowLoadLocalInfile")) {
+            String separator = jdbcUrl.contains("?") ? "&" : "?";
+            config.setJdbcUrl(jdbcUrl + separator + "allowLoadLocalInfile=true");
+        }
+        super.initialize();
+
+        // Enable local_infile on server side (requires SUPER or SYSTEM_VARIABLES_ADMIN)
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.execute("SET GLOBAL local_infile = ON");
+            conn.commit();
+            log.info("MySQL server local_infile enabled for LOAD DATA LOCAL INFILE");
+        } catch (SQLException e) {
+            log.warn("Could not enable MySQL server local_infile (may need SUPER privilege): {}", e.getMessage());
+        }
+    }
+
+    @Override
     public Map<String, Object> collectMetrics() throws SQLException {
         Map<String, Object> metrics = new HashMap<>();
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
@@ -76,41 +115,21 @@ public class MySQLAdapter extends AbstractDatabaseAdapter {
     public Map<String, Object> collectHostMetrics() throws SQLException {
         Map<String, Object> metrics = new HashMap<>();
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            // MySQL doesn't have direct OS metrics, but we can get some I/O stats
-            // from performance_schema if available
-            try {
-                // File I/O statistics
-                ResultSet rs = stmt.executeQuery("""
-                    SELECT SUM(SUM_NUMBER_OF_BYTES_READ) as bytes_read,
-                           SUM(SUM_NUMBER_OF_BYTES_WRITE) as bytes_write
-                    FROM performance_schema.file_summary_by_event_name
-                    WHERE EVENT_NAME LIKE 'wait/io/file/%'
-                """);
-                if (rs.next()) {
-                    metrics.put("diskReadBytes", rs.getLong("bytes_read"));
-                    metrics.put("diskWriteBytes", rs.getLong("bytes_write"));
+            // Collect disk I/O and network I/O from SHOW GLOBAL STATUS
+            ResultSet rs = stmt.executeQuery(
+                "SHOW GLOBAL STATUS WHERE Variable_name IN " +
+                "('Innodb_data_read', 'Innodb_data_written', 'Bytes_received', 'Bytes_sent')");
+            while (rs.next()) {
+                String name = rs.getString(1);
+                String value = rs.getString(2);
+                switch (name) {
+                    case "Innodb_data_read" -> metrics.put("diskReadBytes", Long.parseLong(value));
+                    case "Innodb_data_written" -> metrics.put("diskWriteBytes", Long.parseLong(value));
+                    case "Bytes_received" -> metrics.put("networkRecvBytes", Long.parseLong(value));
+                    case "Bytes_sent" -> metrics.put("networkSentBytes", Long.parseLong(value));
                 }
-                rs.close();
-            } catch (SQLException e) {
-                log.debug("Could not get file I/O stats: {}", e.getMessage());
             }
-
-            // Network I/O from performance_schema (if available)
-            try {
-                ResultSet rs = stmt.executeQuery("""
-                    SELECT SUM(SUM_NUMBER_OF_BYTES_READ) as bytes_recv,
-                           SUM(SUM_NUMBER_OF_BYTES_WRITE) as bytes_sent
-                    FROM performance_schema.socket_summary_by_event_name
-                """);
-                if (rs.next()) {
-                    metrics.put("networkRecvBytes", rs.getLong("bytes_recv"));
-                    metrics.put("networkSentBytes", rs.getLong("bytes_sent"));
-                }
-                rs.close();
-            } catch (SQLException e) {
-                log.debug("Could not get network I/O stats: {}", e.getMessage());
-            }
-
+            rs.close();
             conn.commit();
         }
         return metrics;

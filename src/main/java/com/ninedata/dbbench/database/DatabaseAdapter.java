@@ -46,4 +46,21 @@ public interface DatabaseAdapter {
     default Map<String, Object> collectHostMetrics() throws SQLException {
         return new HashMap<>();
     }
+
+    /**
+     * Check if this database adapter supports CSV-based fast loading.
+     */
+    default boolean supportsCsvLoad() {
+        return false;
+    }
+
+    /**
+     * Load a CSV file into the specified table using database-native bulk load mechanism.
+     * @param tableName target table name
+     * @param csvFilePath absolute path to the CSV file
+     * @param columns column names in CSV column order
+     */
+    default void loadCsvFile(String tableName, String csvFilePath, String[] columns) throws SQLException {
+        throw new UnsupportedOperationException("CSV load not supported for " + getDatabaseType());
+    }
 }

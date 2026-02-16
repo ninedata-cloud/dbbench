@@ -16,11 +16,12 @@
 
 ## Features
 
-- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng
+- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, GBase8s, Sybase, SAP HANA
 - **Full TPC-C Implementation**: All 5 transaction types with configurable mix
 - **Real-Time Dashboard**: Web UI with live charts and metrics
+- **CSV Fast Load**: Database-native bulk import for faster data loading (MySQL LOAD DATA, PostgreSQL COPY, etc.)
 - **Dual Mode**: CLI for automation, Web UI for interactive use
-- **Comprehensive Metrics**: Transaction, Database, and OS metrics collection
+- **Comprehensive Metrics**: Transaction, Database, OS, and Database Host metrics collection
 - **Easy Configuration**: JDBC URL based connection, auto database type detection
 
 ## Supported Databases
@@ -35,6 +36,11 @@
 | TiDB | `jdbc:mysql://host:4000/database` |
 | OceanBase | `jdbc:oceanbase://host:2881/database` |
 | Dameng | `jdbc:dm://host:5236/database` |
+| SQLite | `jdbc:sqlite:./tpcc.db` |
+| YashanDB | `jdbc:yasdb://host:1688/database` |
+| GBase8s | `jdbc:gbasedbt-sqli://host:9088/database:GBASEDBTSERVER=server` |
+| Sybase | `jdbc:sybase:Tds:host:5000/database` |
+| SAP HANA | `jdbc:sap://host:30015/?databaseName=database` |
 
 #### Main Dashboard
 ![Main Dashboard](src/main/resources/static/img/main1.jpg)
@@ -95,6 +101,30 @@ cd dbbench
 mvn clean package -DskipTests
 ```
 
+### Proprietary JDBC Drivers
+
+Some databases require proprietary JDBC drivers that are not available in Maven Central. These are declared with `provided` scope and must be supplied at runtime:
+
+| Database | Driver JAR | How to Obtain |
+|----------|-----------|---------------|
+| SAP HANA | `ngdbc-*.jar` | [SAP Development Tools](https://tools.hana.ondemand.com/#hanatools) |
+| GBase 8s | `gbasedbt-jdbc-*.jar` | Contact [GBase](https://www.gbase.cn) or extract from GBase 8s installation |
+| Sybase ASE | `jconn4.jar` | Extract from SAP ASE installation (`$SYBASE/jConnect-*/classes/jconn4.jar`) |
+
+Place the driver JAR in the classpath when running:
+
+```bash
+java -cp "target/dbbench-1.0.0.jar:drivers/*" com.ninedata.dbbench.DBBenchApplication
+```
+
+Or install to your local Maven repository:
+
+```bash
+mvn install:install-file -Dfile=ngdbc.jar -DgroupId=com.sap.cloud.db.jdbc -DartifactId=ngdbc -Dversion=2.20.11 -Dpackaging=jar
+mvn install:install-file -Dfile=gbasedbt-jdbc.jar -DgroupId=com.gbasedbt -DartifactId=gbasedbt-jdbc -Dversion=3.5.1 -Dpackaging=jar
+mvn install:install-file -Dfile=jconn4.jar -DgroupId=com.sybase -DartifactId=jconn4 -Dversion=16.0 -Dpackaging=jar
+```
+
 ### Web Mode
 
 Start the web server:
@@ -148,6 +178,7 @@ java -jar target/dbbench-1.0.0.jar \
 | `-d, --duration` | Test duration in seconds | 60 |
 | `--pool-size` | Connection pool size | 50 |
 | `--load-threads` | Parallel threads for data loading | 4 |
+| `--csv-load` | Use database-native CSV bulk loading | false |
 | `--load-only` | Only load data, skip benchmark | false |
 | `--clean` | Clean existing data and reload | false |
 | `-h, --help` | Show help message | - |
@@ -177,6 +208,7 @@ benchmark.terminals=50
 benchmark.duration=60
 benchmark.think-time=false
 benchmark.load-concurrency=4
+benchmark.csv-load=false
 
 # Transaction Mix (TPC-C Standard, must total 100%)
 benchmark.mix.new-order=45
@@ -202,6 +234,8 @@ All configuration can be overridden via environment variables:
 | `BENCHMARK_TERMINALS` | Concurrent threads | 50 |
 | `BENCHMARK_DURATION` | Test duration (seconds) | 60 |
 | `BENCHMARK_LOAD_CONCURRENCY` | Data loading threads | 4 |
+| `BENCHMARK_LOAD_CONCURRENCY` | Data loading threads | 4 |
+| `BENCHMARK_CSV_LOAD` | Use CSV bulk loading (true/false) | false |
 | `JAVA_OPTS` | JVM options | -Xms512m -Xmx1024m |
 
 ## REST API
@@ -223,10 +257,10 @@ All configuration can be overridden via environment variables:
 
 ## WebSocket
 
-Connect to `ws://localhost:8080/ws/metrics` for real-time metrics streaming.
+Connect to `ws://localhost:1929/ws/metrics` for real-time metrics streaming.
 
 Message types:
-- Metrics update: `{ "transaction": {...}, "os": {...}, "database": {...} }`
+- Metrics update: `{ "transaction": {...}, "client": {...}, "database": {...} }`
 - Status change: `{ "type": "status", "status": "RUNNING" }`
 - Progress update: `{ "type": "progress", "progress": 50, "message": "Loading..." }`
 - Log entry: `{ "type": "log", "log": { "level": "INFO", "message": "..." } }`
@@ -256,7 +290,7 @@ Message types:
 - Row lock waits
 - Slow queries count
 
-### OS Metrics
+### Client Metrics (Local Machine)
 - CPU usage (%)
 - Memory usage (%)
 - Load average (1m, 5m, 15m)

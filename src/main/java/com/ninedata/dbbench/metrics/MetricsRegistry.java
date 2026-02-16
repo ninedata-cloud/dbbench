@@ -78,12 +78,12 @@ public class MetricsRegistry {
         return result;
     }
 
-    public void takeSnapshot(Map<String, Object> dbMetrics, Map<String, Object> osMetrics) {
+    public void takeSnapshot(Map<String, Object> dbMetrics, Map<String, Object> clientMetrics) {
         MetricsSnapshot snapshot = new MetricsSnapshot();
         snapshot.setTimestamp(System.currentTimeMillis());
         snapshot.setTransactionMetrics(new HashMap<>(getCurrentMetrics()));
         snapshot.setDatabaseMetrics(dbMetrics != null ? new HashMap<>(dbMetrics) : new HashMap<>());
-        snapshot.setOsMetrics(osMetrics != null ? new HashMap<>(osMetrics) : new HashMap<>());
+        snapshot.setClientMetrics(clientMetrics != null ? new HashMap<>(clientMetrics) : new HashMap<>());
         history.add(snapshot);
 
         // Keep only last hour of data (3600 snapshots at 1/sec)

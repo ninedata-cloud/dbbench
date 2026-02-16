@@ -5,7 +5,7 @@ import com.ninedata.dbbench.config.DatabaseConfig;
 import com.ninedata.dbbench.database.DatabaseAdapter;
 import com.ninedata.dbbench.database.DatabaseFactory;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
-import com.ninedata.dbbench.metrics.OSMetricsCollector;
+import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import com.ninedata.dbbench.metrics.SshMetricsCollector;
 import com.ninedata.dbbench.tpcc.TPCCUtil;
 import com.ninedata.dbbench.tpcc.loader.TPCCLoader;
@@ -28,7 +28,7 @@ public class BenchmarkEngine {
     private final DatabaseConfig dbConfig;
     private final BenchmarkConfig benchConfig;
     private final MetricsRegistry metricsRegistry;
-    private final OSMetricsCollector osMetricsCollector;
+    private final ClientMetricsCollector clientMetricsCollector;
 
     private DatabaseAdapter adapter;
     private SshMetricsCollector sshCollector;
@@ -53,11 +53,11 @@ public class BenchmarkEngine {
     private volatile TPCCLoader currentLoader = null;
 
     public BenchmarkEngine(DatabaseConfig dbConfig, BenchmarkConfig benchConfig,
-                           MetricsRegistry metricsRegistry, OSMetricsCollector osMetricsCollector) {
+                           MetricsRegistry metricsRegistry, ClientMetricsCollector clientMetricsCollector) {
         this.dbConfig = dbConfig;
         this.benchConfig = benchConfig;
         this.metricsRegistry = metricsRegistry;
-        this.osMetricsCollector = osMetricsCollector;
+        this.clientMetricsCollector = clientMetricsCollector;
     }
 
     public void setMetricsCallback(Consumer<Map<String, Object>> callback) {
@@ -127,6 +127,7 @@ public class BenchmarkEngine {
             if (bench.containsKey("duration")) benchConfig.setDuration(((Number) bench.get("duration")).intValue());
             if (bench.containsKey("thinkTime")) benchConfig.setThinkTime((Boolean) bench.get("thinkTime"));
             if (bench.containsKey("loadConcurrency")) benchConfig.setLoadConcurrency(((Number) bench.get("loadConcurrency")).intValue());
+            if (bench.containsKey("useCsvLoad")) benchConfig.setUseCsvLoad(Boolean.TRUE.equals(bench.get("useCsvLoad")));
         }
 
         // Update transaction mix
@@ -279,7 +280,7 @@ public class BenchmarkEngine {
             progressCallback.accept("Creating schema...");
             adapter.createSchema();
 
-            TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency());
+            TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.isUseCsvLoad());
             currentLoader = loader;
             loader.setProgressCallback(progressCallback);
             loader.load();
@@ -292,6 +293,7 @@ public class BenchmarkEngine {
             progressCallback.accept("Data load completed successfully");
         } catch (Exception e) {
             status = "ERROR";
+            e.printStackTrace();
             throw new SQLException("Data load failed: " + e.getMessage(), e);
         } finally {
             loading.set(false);
@@ -315,6 +317,7 @@ public class BenchmarkEngine {
         CompletableFuture.runAsync(() -> {
             try {
                 status = "LOADING";
+                startMetricsCollection();
                 addLog("INFO", String.format("Starting TPC-C data load for %d warehouse(s) with %d threads",
                         benchConfig.getWarehouses(), benchConfig.getLoadConcurrency()));
 
@@ -325,7 +328,7 @@ public class BenchmarkEngine {
                 adapter.createSchema();
                 addLog("INFO", "Schema created successfully");
 
-                TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency());
+                TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.isUseCsvLoad());
                 currentLoader = loader;
                 loader.setProgressCallback(msg -> {
                     addLog("INFO", msg);
@@ -372,6 +375,7 @@ public class BenchmarkEngine {
                     broadcastStatusChange("CANCELLED");
                 } else {
                     status = "ERROR";
+                    e.printStackTrace();
                     addLog("ERROR", "Data load failed: " + e.getMessage());
                     broadcastLoadProgress(-1, "Error: " + e.getMessage());
                     broadcastStatusChange("ERROR");
@@ -379,6 +383,7 @@ public class BenchmarkEngine {
             } finally {
                 loading.set(false);
                 currentLoader = null;
+                stopMetricsCollection();
             }
         });
     }
@@ -422,6 +427,25 @@ public class BenchmarkEngine {
         }
     }
 
+    /**
+     * Start periodic metrics collection (OS, database, SSH host)
+     */
+    private void startMetricsCollection() {
+        stopMetricsCollection();
+        metricsScheduler = Executors.newSingleThreadScheduledExecutor();
+        metricsScheduler.scheduleAtFixedRate(this::collectAndBroadcastMetrics, 1, 1, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Stop periodic metrics collection
+     */
+    private void stopMetricsCollection() {
+        if (metricsScheduler != null && !metricsScheduler.isShutdown()) {
+            metricsScheduler.shutdownNow();
+            metricsScheduler = null;
+        }
+    }
+
     public void cleanData() throws SQLException {
         if (running.get() || loading.get()) {
             throw new IllegalStateException("Cannot clean data while running or loading");
@@ -457,7 +481,6 @@ public class BenchmarkEngine {
 
         int terminals = benchConfig.getTerminals();
         executorService = Executors.newFixedThreadPool(terminals);
-        metricsScheduler = Executors.newSingleThreadScheduledExecutor();
 
         addLog("INFO", String.format("Starting benchmark with %d terminals for %d seconds", terminals, benchConfig.getDuration()));
         addLog("INFO", String.format("Transaction mix: NewOrder=%d%%, Payment=%d%%, OrderStatus=%d%%, Delivery=%d%%, StockLevel=%d%%",
@@ -469,7 +492,7 @@ public class BenchmarkEngine {
         broadcastStatusChange("RUNNING");
 
         // Start metrics collection
-        metricsScheduler.scheduleAtFixedRate(this::collectAndBroadcastMetrics, 1, 1, TimeUnit.SECONDS);
+        startMetricsCollection();
 
         // Start terminal workers
         for (int i = 0; i < terminals; i++) {
@@ -479,7 +502,7 @@ public class BenchmarkEngine {
             executorService.submit(() -> runTerminal(terminalId, warehouseId, districtId));
         }
 
-        // Schedule stop
+        // Schedule stop on the metrics scheduler
         metricsScheduler.schedule(this::stop, benchConfig.getDuration(), TimeUnit.SECONDS);
     }
 
@@ -537,7 +560,7 @@ public class BenchmarkEngine {
     private void collectAndBroadcastMetrics() {
         try {
             Map<String, Object> dbMetrics = adapter.collectMetrics();
-            Map<String, Object> osMetrics = osMetricsCollector.collect();
+            Map<String, Object> clientMetrics = clientMetricsCollector.collect();
 
             // Use SSH metrics for dbHost if available, otherwise fall back to SQL-based
             Map<String, Object> hostMetrics;
@@ -550,15 +573,26 @@ public class BenchmarkEngine {
                 hostMetrics = adapter.collectHostMetrics();
             }
 
-            metricsRegistry.takeSnapshot(dbMetrics, osMetrics);
+            metricsRegistry.takeSnapshot(dbMetrics, clientMetrics);
 
             if (metricsCallback != null) {
                 Map<String, Object> allMetrics = new LinkedHashMap<>();
                 allMetrics.put("transaction", metricsRegistry.getCurrentMetrics());
                 allMetrics.put("database", dbMetrics);
-                allMetrics.put("os", osMetrics);
+                allMetrics.put("client", clientMetrics);
                 allMetrics.put("dbHost", hostMetrics);
                 allMetrics.put("status", status);
+
+                // Include SSH connection status so frontend can update in real-time
+                Map<String, Object> sshStatus = new LinkedHashMap<>();
+                sshStatus.put("enabled", dbConfig.getSsh().isEnabled());
+                sshStatus.put("connected", sshCollector != null && sshCollector.isConnected());
+                if (dbConfig.getSsh().isEnabled()) {
+                    sshStatus.put("host", dbConfig.getEffectiveSshHost());
+                    sshStatus.put("port", dbConfig.getSsh().getPort());
+                }
+                allMetrics.put("ssh", sshStatus);
+
                 metricsCallback.accept(allMetrics);
             }
         } catch (Exception e) {
@@ -585,9 +619,7 @@ public class BenchmarkEngine {
             }
         }
 
-        if (metricsScheduler != null) {
-            metricsScheduler.shutdownNow();
-        }
+        stopMetricsCollection();
 
         status = "STOPPED";
         addLog("INFO", "Benchmark stopped");
@@ -651,6 +683,7 @@ public class BenchmarkEngine {
         bench.put("rampup", benchConfig.getRampup());
         bench.put("thinkTime", benchConfig.isThinkTime());
         bench.put("loadConcurrency", benchConfig.getLoadConcurrency());
+        bench.put("useCsvLoad", benchConfig.isUseCsvLoad());
         config.put("benchmark", bench);
 
         // Transaction mix
@@ -665,7 +698,7 @@ public class BenchmarkEngine {
         // SSH config (mask sensitive fields)
         Map<String, Object> ssh = new LinkedHashMap<>();
         ssh.put("enabled", dbConfig.getSsh().isEnabled());
-        ssh.put("host", dbConfig.getSsh().getHost());
+        ssh.put("host", dbConfig.getEffectiveSshHost());
         ssh.put("port", dbConfig.getSsh().getPort());
         ssh.put("username", dbConfig.getSsh().getUsername());
         ssh.put("hasPassword", dbConfig.getSsh().getPassword() != null && !dbConfig.getSsh().getPassword().isBlank());

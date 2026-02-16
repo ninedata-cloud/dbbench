@@ -22,6 +22,10 @@ let lastStatus = null;
 let lastDiskReadBytes = 0;
 let lastDiskWriteBytes = 0;
 let lastDiskTime = Date.now();
+// For calculating network I/O rate (SQL-sourced cumulative bytes)
+let lastNetRecvBytes = 0;
+let lastNetSentBytes = 0;
+let lastNetTime = Date.now();
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -274,14 +278,14 @@ function initCharts() {
         }
     });
 
-    // Database Memory Chart
+    // Buffer Pool Hit Ratio Chart
     const dbMemCtx = document.getElementById('dbMemChart').getContext('2d');
     dbMemChart = new Chart(dbMemCtx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [{
-                label: 'Memory %',
+                label: 'Hit Ratio %',
                 data: [],
                 borderColor: '#2ecc71',
                 backgroundColor: 'rgba(46, 204, 113, 0.1)',
@@ -411,7 +415,7 @@ function initCharts() {
         }
     });
 
-    // Database Connections & Locks Chart
+    // Database Connections Chart
     const dbConnCtx = document.getElementById('dbConnChart').getContext('2d');
     dbConnChart = new Chart(dbConnCtx, {
         type: 'line',
@@ -423,22 +427,10 @@ function initCharts() {
                     data: [],
                     borderColor: '#00d9ff',
                     backgroundColor: 'rgba(0, 217, 255, 0.1)',
-                    fill: false,
+                    fill: true,
                     tension: 0.4,
                     pointRadius: 2,
-                    pointHoverRadius: 4,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Lock Waits',
-                    data: [],
-                    borderColor: '#ff4757',
-                    backgroundColor: 'rgba(255, 71, 87, 0.1)',
-                    fill: false,
-                    tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4,
-                    yAxisID: 'y1'
+                    pointHoverRadius: 4
                 }
             ]
         },
@@ -446,33 +438,10 @@ function initCharts() {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 0 },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: { color: '#888', boxWidth: 12, padding: 10 }
-                }
-            },
+            plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: '#333' }, ticks: { color: '#888', maxTicksLimit: 10 } },
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    grid: { color: '#333' },
-                    ticks: { color: '#00d9ff' },
-                    beginAtZero: true,
-                    title: { display: true, text: 'Connections', color: '#00d9ff' }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    ticks: { color: '#ff4757' },
-                    beginAtZero: true,
-                    title: { display: true, text: 'Lock Waits', color: '#ff4757' }
-                }
+                y: { grid: { color: '#333' }, ticks: { color: '#888' }, beginAtZero: true }
             }
         }
     });
@@ -583,20 +552,20 @@ function updateMetrics(data) {
         }
     }
 
-    if (data.os) {
-        const os = data.os;
-        document.getElementById('cpuUsage').textContent = (os.cpuUsage || 0).toFixed(1) + '%';
-        document.getElementById('cpuBar').style.width = Math.min(os.cpuUsage || 0, 100) + '%';
-        document.getElementById('memUsage').textContent = (os.memoryUsage || 0).toFixed(1) + '%';
-        document.getElementById('memBar').style.width = Math.min(os.memoryUsage || 0, 100) + '%';
-        document.getElementById('loadAvg').textContent = os.loadAvg1?.toFixed(2) || '0.00';
+    if (data.client) {
+        const client = data.client;
+        document.getElementById('cpuUsage').textContent = (client.cpuUsage || 0).toFixed(1) + '%';
+        document.getElementById('cpuBar').style.width = Math.min(client.cpuUsage || 0, 100) + '%';
+        document.getElementById('memUsage').textContent = (client.memoryUsage || 0).toFixed(1) + '%';
+        document.getElementById('memBar').style.width = Math.min(client.memoryUsage || 0, 100) + '%';
+        document.getElementById('loadAvg').textContent = client.loadAvg1?.toFixed(2) || '0.00';
 
         // Always update CPU and Network charts for continuous monitoring
         const now = new Date().toLocaleTimeString();
 
         // CPU chart
         cpuChart.data.labels.push(now);
-        cpuChart.data.datasets[0].data.push(os.cpuUsage || 0);
+        cpuChart.data.datasets[0].data.push(client.cpuUsage || 0);
         if (cpuChart.data.labels.length > maxDataPoints) {
             cpuChart.data.labels.shift();
             cpuChart.data.datasets[0].data.shift();
@@ -605,8 +574,8 @@ function updateMetrics(data) {
 
         // Network chart
         networkChart.data.labels.push(now);
-        networkChart.data.datasets[0].data.push(os.networkRecvBytesPerSec || 0);
-        networkChart.data.datasets[1].data.push(os.networkSentBytesPerSec || 0);
+        networkChart.data.datasets[0].data.push(client.networkRecvBytesPerSec || 0);
+        networkChart.data.datasets[1].data.push(client.networkSentBytesPerSec || 0);
         if (networkChart.data.labels.length > maxDataPoints) {
             networkChart.data.labels.shift();
             networkChart.data.datasets[0].data.shift();
@@ -619,35 +588,46 @@ function updateMetrics(data) {
         const db = data.database;
         document.getElementById('dbConnections').textContent = db.active_connections || db.activeConnections || 0;
         document.getElementById('bufferHit').textContent = (db.buffer_pool_hit_ratio || db.cache_hit_ratio || 0).toFixed(1) + '%';
-        document.getElementById('lockWaits').textContent = db.row_lock_waits || db.waiting_locks || db.lock_waits || 0;
-        document.getElementById('slowQueries').textContent = db.slow_queries || 0;
 
-        // Update database connections & locks chart
+        // Update database connections chart
         const now = new Date().toLocaleTimeString();
         const connections = db.active_connections || db.activeConnections || 0;
-        const lockWaits = db.row_lock_waits || db.waiting_locks || db.lock_waits || 0;
 
         dbConnChart.data.labels.push(now);
         dbConnChart.data.datasets[0].data.push(connections);
-        dbConnChart.data.datasets[1].data.push(lockWaits);
 
         if (dbConnChart.data.labels.length > maxDataPoints) {
             dbConnChart.data.labels.shift();
             dbConnChart.data.datasets[0].data.shift();
-            dbConnChart.data.datasets[1].data.shift();
         }
         dbConnChart.update();
+
+        // Buffer Pool Hit Ratio Chart
+        const hitRatio = db.buffer_pool_hit_ratio || db.cache_hit_ratio || db.plan_cache_hit_ratio;
+        if (hitRatio !== undefined) {
+            dbMemChart.data.labels.push(now);
+            dbMemChart.data.datasets[0].data.push(hitRatio);
+            if (dbMemChart.data.labels.length > maxDataPoints) {
+                dbMemChart.data.labels.shift();
+                dbMemChart.data.datasets[0].data.shift();
+            }
+            dbMemChart.update();
+        }
     }
 
     // Database Host Metrics - Update Charts
-    if (data.dbHost) {
-        const host = data.dbHost;
+    // Only use dbHost data (from SSH or SQL queries against the database server)
+    // data.client is the local machine metrics and should NOT be used here
+    const hostData = data.dbHost || {};
+
+    {
         const now = new Date().toLocaleTimeString();
 
-        // CPU Chart
-        if (host.cpuUsage !== undefined) {
+        // CPU Chart - dbHost only
+        const cpuVal = hostData.cpuUsage;
+        if (cpuVal !== undefined) {
             dbCpuChart.data.labels.push(now);
-            dbCpuChart.data.datasets[0].data.push(host.cpuUsage);
+            dbCpuChart.data.datasets[0].data.push(cpuVal);
             if (dbCpuChart.data.labels.length > maxDataPoints) {
                 dbCpuChart.data.labels.shift();
                 dbCpuChart.data.datasets[0].data.shift();
@@ -655,36 +635,23 @@ function updateMetrics(data) {
             dbCpuChart.update();
         }
 
-        // Memory Chart (SSH-sourced)
-        if (host.memoryUsage !== undefined) {
-            dbMemChart.data.labels.push(now);
-            dbMemChart.data.datasets[0].data.push(host.memoryUsage);
-            if (dbMemChart.data.labels.length > maxDataPoints) {
-                dbMemChart.data.labels.shift();
-                dbMemChart.data.datasets[0].data.shift();
-            }
-            dbMemChart.update();
-        }
-
-        // Disk I/O Chart - SSH provides pre-computed rates, SQL provides cumulative bytes
-        if (host.diskReadBytesPerSec !== undefined) {
-            // SSH-sourced: already rate values
+        // Disk I/O Chart - dbHost only
+        if (hostData.diskReadBytesPerSec !== undefined) {
             dbDiskChart.data.labels.push(now);
-            dbDiskChart.data.datasets[0].data.push(host.diskReadBytesPerSec);
-            dbDiskChart.data.datasets[1].data.push(host.diskWriteBytesPerSec || 0);
+            dbDiskChart.data.datasets[0].data.push(hostData.diskReadBytesPerSec);
+            dbDiskChart.data.datasets[1].data.push(hostData.diskWriteBytesPerSec || 0);
             if (dbDiskChart.data.labels.length > maxDataPoints) {
                 dbDiskChart.data.labels.shift();
                 dbDiskChart.data.datasets[0].data.shift();
                 dbDiskChart.data.datasets[1].data.shift();
             }
             dbDiskChart.update();
-        } else if (host.diskReadBytes !== undefined && host.diskWriteBytes !== undefined) {
-            // SQL-sourced: calculate rate client-side
+        } else if (hostData.diskReadBytes !== undefined && hostData.diskWriteBytes !== undefined) {
             const currentTime = Date.now();
             const timeDiff = (currentTime - lastDiskTime) / 1000;
             if (lastDiskReadBytes > 0 && timeDiff > 0) {
-                const readRate = Math.max(0, (host.diskReadBytes - lastDiskReadBytes) / timeDiff);
-                const writeRate = Math.max(0, (host.diskWriteBytes - lastDiskWriteBytes) / timeDiff);
+                const readRate = Math.max(0, (hostData.diskReadBytes - lastDiskReadBytes) / timeDiff);
+                const writeRate = Math.max(0, (hostData.diskWriteBytes - lastDiskWriteBytes) / timeDiff);
                 dbDiskChart.data.labels.push(now);
                 dbDiskChart.data.datasets[0].data.push(readRate);
                 dbDiskChart.data.datasets[1].data.push(writeRate);
@@ -695,22 +662,90 @@ function updateMetrics(data) {
                 }
                 dbDiskChart.update();
             }
-            lastDiskReadBytes = host.diskReadBytes;
-            lastDiskWriteBytes = host.diskWriteBytes;
+            lastDiskReadBytes = hostData.diskReadBytes;
+            lastDiskWriteBytes = hostData.diskWriteBytes;
             lastDiskTime = currentTime;
         }
 
-        // Network I/O Chart (SSH-sourced)
-        if (host.networkRecvBytesPerSec !== undefined) {
+        // Update Database Metrics panel text fields
+        // CPU Usage
+        const dbCpuVal = hostData.cpuUsage;
+        if (dbCpuVal !== undefined) {
+            document.getElementById('dbCpuUsage').textContent = dbCpuVal.toFixed(1) + '%';
+        }
+        // Disk I/O - show read+write rate
+        {
+            let diskRead = 0, diskWrite = 0, hasDisk = false;
+            if (hostData.diskReadBytesPerSec !== undefined) {
+                diskRead = hostData.diskReadBytesPerSec || 0;
+                diskWrite = hostData.diskWriteBytesPerSec || 0;
+                hasDisk = true;
+            }
+            if (hasDisk) {
+                document.getElementById('dbDiskIO').textContent =
+                    formatBytesShort(diskRead) + '/s R | ' + formatBytesShort(diskWrite) + '/s W';
+            }
+        }
+        // Network I/O - show recv+sent rate
+        {
+            let netRecv = 0, netSent = 0, hasNet = false;
+            if (hostData.networkRecvBytesPerSec !== undefined) {
+                netRecv = hostData.networkRecvBytesPerSec || 0;
+                netSent = hostData.networkSentBytesPerSec || 0;
+                hasNet = true;
+            }
+            if (hasNet) {
+                document.getElementById('dbNetIO').textContent =
+                    formatBytesShort(netRecv) + '/s ↓ | ' + formatBytesShort(netSent) + '/s ↑';
+            }
+        }
+
+        // Network I/O Chart - dbHost only
+        if (hostData.networkRecvBytesPerSec !== undefined) {
             dbNetChart.data.labels.push(now);
-            dbNetChart.data.datasets[0].data.push(host.networkRecvBytesPerSec);
-            dbNetChart.data.datasets[1].data.push(host.networkSentBytesPerSec || 0);
+            dbNetChart.data.datasets[0].data.push(hostData.networkRecvBytesPerSec);
+            dbNetChart.data.datasets[1].data.push(hostData.networkSentBytesPerSec || 0);
             if (dbNetChart.data.labels.length > maxDataPoints) {
                 dbNetChart.data.labels.shift();
                 dbNetChart.data.datasets[0].data.shift();
                 dbNetChart.data.datasets[1].data.shift();
             }
             dbNetChart.update();
+        } else if (hostData.networkRecvBytes !== undefined && hostData.networkSentBytes !== undefined) {
+            const currentTime = Date.now();
+            const timeDiff = (currentTime - lastNetTime) / 1000;
+            if (lastNetRecvBytes > 0 && timeDiff > 0) {
+                const recvRate = Math.max(0, (hostData.networkRecvBytes - lastNetRecvBytes) / timeDiff);
+                const sentRate = Math.max(0, (hostData.networkSentBytes - lastNetSentBytes) / timeDiff);
+                dbNetChart.data.labels.push(now);
+                dbNetChart.data.datasets[0].data.push(recvRate);
+                dbNetChart.data.datasets[1].data.push(sentRate);
+                if (dbNetChart.data.labels.length > maxDataPoints) {
+                    dbNetChart.data.labels.shift();
+                    dbNetChart.data.datasets[0].data.shift();
+                    dbNetChart.data.datasets[1].data.shift();
+                }
+                dbNetChart.update();
+            }
+            lastNetRecvBytes = hostData.networkRecvBytes;
+            lastNetSentBytes = hostData.networkSentBytes;
+            lastNetTime = currentTime;
+        }
+    }
+
+    // Update SSH connection status in real-time
+    if (data.ssh) {
+        const sshStatusEl = document.getElementById('cfgSshStatus');
+        if (sshStatusEl) {
+            if (data.ssh.enabled) {
+                const host = data.ssh.host || '(auto-detect)';
+                const connStatus = data.ssh.connected ? 'Connected' : 'Disconnected';
+                sshStatusEl.textContent = `SSH: ${connStatus} (${host}:${data.ssh.port})`;
+                sshStatusEl.style.color = data.ssh.connected ? '#00ff88' : '#ff4757';
+            } else {
+                sshStatusEl.textContent = 'SSH: Disabled';
+                sshStatusEl.style.color = '#888';
+            }
         }
     }
 
@@ -779,6 +814,7 @@ function displayConfig(cfg) {
         document.getElementById('cfgTerminals').textContent = cfg.benchmark.terminals || '-';
         document.getElementById('cfgDuration').textContent = (cfg.benchmark.duration || '-') + 's';
         document.getElementById('cfgLoadConcurrency').textContent = cfg.benchmark.loadConcurrency || '-';
+        document.getElementById('cfgCsvLoad').textContent = cfg.benchmark.useCsvLoad ? 'On' : 'Off';
     }
 
     if (cfg.transactionMix) {
@@ -826,6 +862,7 @@ function openConfigModal() {
     document.getElementById('cfgFormDuration').value = cfg.benchmark?.duration || 60;
     document.getElementById('cfgFormLoadConcurrency').value = cfg.benchmark?.loadConcurrency || 4;
     document.getElementById('cfgFormThinkTime').checked = cfg.benchmark?.thinkTime || false;
+    document.getElementById('cfgFormUseCsvLoad').checked = cfg.benchmark?.useCsvLoad || false;
 
     // Transaction mix
     document.getElementById('cfgFormMixNewOrder').value = cfg.transactionMix?.newOrder || 45;
@@ -843,6 +880,9 @@ function openConfigModal() {
     document.getElementById('cfgFormSshKey').value = '';
     toggleSshFields();
 
+    // Apply SQLite constraints if needed
+    applySqliteConstraints(cfg.database?.type || 'mysql');
+
     // Clear connection test result
     document.getElementById('connectionTestResult').innerHTML = '';
 
@@ -850,19 +890,23 @@ function openConfigModal() {
 }
 
 async function saveConfig() {
+    const dbType = document.getElementById('cfgFormDbType').value;
+    const isSqlite = dbType === 'sqlite';
+
     const newConfig = {
         database: {
-            type: document.getElementById('cfgFormDbType').value,
+            type: dbType,
             jdbcUrl: document.getElementById('cfgFormJdbcUrl').value,
             username: document.getElementById('cfgFormDbUser').value,
             poolSize: parseInt(document.getElementById('cfgFormPoolSize').value)
         },
         benchmark: {
             warehouses: parseInt(document.getElementById('cfgFormWarehouses').value),
-            terminals: parseInt(document.getElementById('cfgFormTerminals').value),
+            terminals: isSqlite ? 1 : parseInt(document.getElementById('cfgFormTerminals').value),
             duration: parseInt(document.getElementById('cfgFormDuration').value),
-            loadConcurrency: parseInt(document.getElementById('cfgFormLoadConcurrency').value),
-            thinkTime: document.getElementById('cfgFormThinkTime').checked
+            loadConcurrency: isSqlite ? 1 : parseInt(document.getElementById('cfgFormLoadConcurrency').value),
+            thinkTime: document.getElementById('cfgFormThinkTime').checked,
+            useCsvLoad: document.getElementById('cfgFormUseCsvLoad').checked
         },
         transactionMix: {
             newOrder: parseInt(document.getElementById('cfgFormMixNewOrder').value),
@@ -1143,13 +1187,16 @@ async function startBenchmark() {
 
     dbConnChart.data.labels = [];
     dbConnChart.data.datasets[0].data = [];
-    dbConnChart.data.datasets[1].data = [];
     dbConnChart.update();
 
     // Reset disk I/O tracking
     lastDiskReadBytes = 0;
     lastDiskWriteBytes = 0;
     lastDiskTime = Date.now();
+    // Reset network I/O tracking
+    lastNetRecvBytes = 0;
+    lastNetSentBytes = 0;
+    lastNetTime = Date.now();
 
     addLog('Starting benchmark...', 'info');
     const result = await apiCall('start');
@@ -1171,6 +1218,48 @@ async function stopBenchmark() {
 function toggleSshFields() {
     const enabled = document.getElementById('cfgFormSshEnabled').checked;
     document.getElementById('sshFields').style.display = enabled ? 'block' : 'none';
+}
+
+async function testSshConnection() {
+    const btn = document.getElementById('btnTestSsh');
+    const resultEl = document.getElementById('sshTestResult');
+    btn.disabled = true;
+    resultEl.textContent = 'Testing...';
+    resultEl.style.color = '#888';
+
+    const payload = {
+        ssh: {
+            host: document.getElementById('cfgFormSshHost').value,
+            port: parseInt(document.getElementById('cfgFormSshPort').value) || 22,
+            username: document.getElementById('cfgFormSshUser').value,
+            password: document.getElementById('cfgFormSshPass').value,
+            privateKey: document.getElementById('cfgFormSshKey').value
+        },
+        database: {
+            jdbcUrl: document.getElementById('cfgFormJdbcUrl').value
+        }
+    };
+
+    try {
+        const resp = await fetch('/api/benchmark/test-ssh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.success) {
+            resultEl.textContent = data.message;
+            resultEl.style.color = '#00ff88';
+        } else {
+            resultEl.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            resultEl.style.color = '#ff4757';
+        }
+    } catch (e) {
+        resultEl.textContent = 'Error: ' + e.message;
+        resultEl.style.color = '#ff4757';
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 // ==================== Modal ====================
@@ -1254,8 +1343,24 @@ function onDbTypeChange() {
         jdbcUrlInput.value = jdbcUrlTemplates[dbType];
     }
 
+    // SQLite doesn't support concurrency - force terminals and load concurrency to 1
+    applySqliteConstraints(dbType);
+
     // Clear connection test result when type changes
     document.getElementById('connectionTestResult').innerHTML = '';
+}
+
+function applySqliteConstraints(dbType) {
+    const terminalsInput = document.getElementById('cfgFormTerminals');
+    const loadConcurrencyInput = document.getElementById('cfgFormLoadConcurrency');
+    const isSqlite = dbType === 'sqlite';
+
+    if (isSqlite) {
+        terminalsInput.value = 1;
+        loadConcurrencyInput.value = 1;
+    }
+    terminalsInput.disabled = isSqlite;
+    loadConcurrencyInput.disabled = isSqlite;
 }
 
 // ==================== Utilities ====================

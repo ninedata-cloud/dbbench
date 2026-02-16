@@ -21,6 +21,30 @@ public class SQLServerAdapter extends AbstractDatabaseAdapter {
     }
 
     @Override
+    public boolean supportsCsvLoad() {
+        return true;
+    }
+
+    @Override
+    public void loadCsvFile(String tableName, String csvFilePath, String[] columns) throws SQLException {
+        try (Connection conn = getConnection()) {
+            com.microsoft.sqlserver.jdbc.SQLServerBulkCopy bulkCopy =
+                    new com.microsoft.sqlserver.jdbc.SQLServerBulkCopy(conn);
+            bulkCopy.setDestinationTableName(tableName);
+            com.microsoft.sqlserver.jdbc.SQLServerBulkCSVFileRecord csvRecord =
+                    new com.microsoft.sqlserver.jdbc.SQLServerBulkCSVFileRecord(csvFilePath, "UTF-8", ",", false);
+            for (int i = 0; i < columns.length; i++) {
+                csvRecord.addColumnMetadata(i + 1, columns[i], java.sql.Types.VARCHAR, 0, 0);
+            }
+            bulkCopy.writeToServer(csvRecord);
+            bulkCopy.close();
+            conn.commit();
+        } catch (Exception e) {
+            throw new SQLException("SQL Server bulk copy failed for " + tableName, e);
+        }
+    }
+
+    @Override
     public Map<String, Object> collectMetrics() throws SQLException {
         Map<String, Object> metrics = new HashMap<>();
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {

@@ -2,14 +2,15 @@
 
 **Ready-to-Use TPC-C Database Benchmark Tool**
 
-DBBench is a professional database performance testing tool that fully implements the TPC-C benchmark specification. It supports 8 major databases and provides a real-time web monitoring dashboard.
+DBBench is a professional database performance testing tool that fully implements the TPC-C benchmark specification. It supports 13 major databases and provides a real-time web monitoring dashboard.
 
 ## Image Highlights
 
 - **Ready to Use**: Built-in PostgreSQL 17, no external database configuration required
-- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng
+- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, GBase8s, Sybase, SAP HANA
 - **Real-Time Monitoring**: Web UI with live TPS, latency, CPU, memory, network metrics
 - **Full TPC-C**: All 5 transaction types (New-Order, Payment, Order-Status, Delivery, Stock-Level)
+- **CSV Fast Load**: Database-native bulk import (MySQL LOAD DATA, PostgreSQL COPY, etc.) for faster data loading
 - **Flexible Configuration**: Environment variable support for various testing scenarios
 
 ## Quick Start
@@ -67,6 +68,8 @@ docker run -d -p 1929:1929 \
 | `BENCHMARK_WAREHOUSES` | Number of warehouses (data scale) | 10 |
 | `BENCHMARK_TERMINALS` | Concurrent terminals | 50 |
 | `BENCHMARK_DURATION` | Test duration in seconds | 60 |
+| `BENCHMARK_LOAD_CONCURRENCY` | Data loading threads | 4 |
+| `BENCHMARK_CSV_LOAD` | Use CSV bulk loading (true/false) | false |
 | `JAVA_OPTS` | JVM options | -Xms512m -Xmx1024m |
 
 ## Supported Databases
@@ -81,6 +84,11 @@ docker run -d -p 1929:1929 \
 | TiDB | `jdbc:mysql://host:4000/database` |
 | OceanBase | `jdbc:oceanbase://host:2881/database` |
 | Dameng | `jdbc:dm://host:5236/database` |
+| SQLite | `jdbc:sqlite:./tpcc.db` |
+| YashanDB | `jdbc:yasdb://host:1688/database` |
+| GBase8s | `jdbc:gbasedbt-sqli://host:9088/database:GBASEDBTSERVER=server` |
+| Sybase | `jdbc:sybase:Tds:host:5000/database` |
+| SAP HANA | `jdbc:sap://host:30015/?databaseName=database` |
 
 ## Usage Workflow
 

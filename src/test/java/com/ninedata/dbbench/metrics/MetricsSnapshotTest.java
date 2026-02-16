@@ -51,17 +51,17 @@ class MetricsSnapshotTest {
     }
 
     @Test
-    @DisplayName("Should set and get OS metrics")
-    void testOsMetrics() {
+    @DisplayName("Should set and get client metrics")
+    void testClientMetrics() {
         MetricsSnapshot snapshot = new MetricsSnapshot();
-        Map<String, Object> osMetrics = new HashMap<>();
-        osMetrics.put("cpuUsage", 75.5);
-        osMetrics.put("memoryUsage", 60.0);
+        Map<String, Object> clientMetrics = new HashMap<>();
+        clientMetrics.put("cpuUsage", 75.5);
+        clientMetrics.put("memoryUsage", 60.0);
 
-        snapshot.setOsMetrics(osMetrics);
+        snapshot.setClientMetrics(clientMetrics);
 
-        assertEquals(75.5, snapshot.getOsMetrics().get("cpuUsage"));
-        assertEquals(60.0, snapshot.getOsMetrics().get("memoryUsage"));
+        assertEquals(75.5, snapshot.getClientMetrics().get("cpuUsage"));
+        assertEquals(60.0, snapshot.getClientMetrics().get("memoryUsage"));
     }
 
     @Test
@@ -71,11 +71,11 @@ class MetricsSnapshotTest {
 
         snapshot.setTransactionMetrics(null);
         snapshot.setDatabaseMetrics(null);
-        snapshot.setOsMetrics(null);
+        snapshot.setClientMetrics(null);
 
         assertNull(snapshot.getTransactionMetrics());
         assertNull(snapshot.getDatabaseMetrics());
-        assertNull(snapshot.getOsMetrics());
+        assertNull(snapshot.getClientMetrics());
     }
 
     @Test
@@ -85,11 +85,11 @@ class MetricsSnapshotTest {
 
         snapshot.setTransactionMetrics(new HashMap<>());
         snapshot.setDatabaseMetrics(new HashMap<>());
-        snapshot.setOsMetrics(new HashMap<>());
+        snapshot.setClientMetrics(new HashMap<>());
 
         assertTrue(snapshot.getTransactionMetrics().isEmpty());
         assertTrue(snapshot.getDatabaseMetrics().isEmpty());
-        assertTrue(snapshot.getOsMetrics().isEmpty());
+        assertTrue(snapshot.getClientMetrics().isEmpty());
     }
 
     @Test

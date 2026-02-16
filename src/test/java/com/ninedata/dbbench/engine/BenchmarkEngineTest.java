@@ -3,7 +3,7 @@ package com.ninedata.dbbench.engine;
 import com.ninedata.dbbench.config.BenchmarkConfig;
 import com.ninedata.dbbench.config.DatabaseConfig;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
-import com.ninedata.dbbench.metrics.OSMetricsCollector;
+import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -20,15 +20,15 @@ class BenchmarkEngineTest {
     private DatabaseConfig dbConfig;
     private BenchmarkConfig benchConfig;
     private MetricsRegistry metricsRegistry;
-    private OSMetricsCollector osMetricsCollector;
+    private ClientMetricsCollector clientMetricsCollector;
 
     @BeforeEach
     void setUp() {
         dbConfig = new DatabaseConfig();
         benchConfig = new BenchmarkConfig();
         metricsRegistry = new MetricsRegistry();
-        osMetricsCollector = new OSMetricsCollector();
-        engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, osMetricsCollector);
+        clientMetricsCollector = new ClientMetricsCollector();
+        engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
     }
 
     @Test

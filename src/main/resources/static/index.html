@@ -54,6 +54,7 @@
                     <div class="config-item"><span class="config-label">Terminals</span><span class="config-value" id="cfgTerminals">-</span></div>
                     <div class="config-item"><span class="config-label">Duration</span><span class="config-value" id="cfgDuration">-</span></div>
                     <div class="config-item"><span class="config-label">Load Threads</span><span class="config-value" id="cfgLoadConcurrency">-</span></div>
+                    <div class="config-item"><span class="config-label">CSV Load</span><span class="config-value" id="cfgCsvLoad">-</span></div>
                 </div>
                 <div style="margin-top: 10px;">
                     <span class="config-label">JDBC URL:</span>
@@ -113,9 +114,33 @@
                 </div>
             </div>
 
+            <!-- Database Metrics -->
+            <div class="card">
+                <h3>Database Metrics</h3>
+                <div class="metric">
+                    <span class="metric-label">CPU Usage</span>
+                    <span class="metric-value" id="dbCpuUsage">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Buffer Pool Hit Ratio</span>
+                    <span class="metric-value" id="bufferHit">0%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Disk I/O</span>
+                    <span class="metric-value" id="dbDiskIO">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Network I/O</span>
+                    <span class="metric-value" id="dbNetIO">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Active Connections</span>
+                    <span class="metric-value" id="dbConnections">0</span>
+                </div>
+            </div>
             <!-- System Resources -->
             <div class="card">
-                <h3>System Resources</h3>
+                <h3>Client Metrics</h3>
                 <div class="metric">
                     <span class="metric-label">Client CPU Usage</span>
                     <span class="metric-value" id="cpuUsage">0%</span>
@@ -131,27 +156,6 @@
                     <span class="metric-value" id="loadAvg">0.00</span>
                 </div>
             </div>
-
-            <!-- Database Metrics -->
-            <div class="card">
-                <h3>Database Metrics</h3>
-                <div class="metric">
-                    <span class="metric-label">Active Connections</span>
-                    <span class="metric-value" id="dbConnections">0</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Buffer Pool Hit Ratio</span>
-                    <span class="metric-value" id="bufferHit">0%</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Row Lock Waits</span>
-                    <span class="metric-value" id="lockWaits">0</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Slow Queries</span>
-                    <span class="metric-value" id="slowQueries">0</span>
-                </div>
-            </div>
         </div>
 
         <!-- Database Host Metrics Charts - Row 1: CPU, Memory, Disk I/O -->
@@ -163,7 +167,7 @@
                 </div>
             </div>
             <div class="card">
-                <h3>Database Memory Usage</h3>
+                <h3>Buffer Pool Hit Ratio</h3>
                 <div class="chart-container">
                     <canvas id="dbMemChart"></canvas>
                 </div>
@@ -185,7 +189,7 @@
                 </div>
             </div>
             <div class="card">
-                <h3>Database Connections & Locks</h3>
+                <h3>Database Connections</h3>
                 <div class="chart-container">
                     <canvas id="dbConnChart"></canvas>
                 </div>
@@ -383,6 +387,12 @@
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                             <input type="checkbox" id="cfgFormThinkTime" style="width: auto;">
                             Enable Think Time (simulates user delay between transactions)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="cfgFormUseCsvLoad" style="width: auto;">
+                            CSV Fast Load (uses database-native bulk import for faster data loading)
                         </label>
                     </div>
                 </div>

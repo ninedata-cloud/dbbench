@@ -1,10 +1,9 @@
 package com.ninedata.dbbench.web;
 
-import com.ninedata.dbbench.database.DatabaseAdapter;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
 import com.ninedata.dbbench.metrics.MetricsSnapshot;
-import com.ninedata.dbbench.metrics.OSMetricsCollector;
+import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,14 +18,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MetricsController {
     private final MetricsRegistry metricsRegistry;
-    private final OSMetricsCollector osMetricsCollector;
+    private final ClientMetricsCollector clientMetricsCollector;
     private final BenchmarkEngine engine;
 
     @GetMapping("/current")
     public ResponseEntity<Map<String, Object>> current() {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("transaction", metricsRegistry.getCurrentMetrics());
-        response.put("os", osMetricsCollector.collect());
+        response.put("client", clientMetricsCollector.collect());
         response.put("status", engine.getStatus());
         response.put("running", engine.isRunning());
         response.put("loading", engine.isLoading());
@@ -39,7 +38,6 @@ public class MetricsController {
 
         return ResponseEntity.ok(response);
     }
-
     @GetMapping("/history")
     public ResponseEntity<?> history(@RequestParam(defaultValue = "60") int limit) {
         var history = metricsRegistry.getHistory();

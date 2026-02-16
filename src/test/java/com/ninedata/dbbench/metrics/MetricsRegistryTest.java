@@ -104,10 +104,10 @@ class MetricsRegistryTest {
         Map<String, Object> dbMetrics = new HashMap<>();
         dbMetrics.put("connections", 10);
 
-        Map<String, Object> osMetrics = new HashMap<>();
-        osMetrics.put("cpuUsage", 50.0);
+        Map<String, Object> clientMetrics = new HashMap<>();
+        clientMetrics.put("cpuUsage", 50.0);
 
-        registry.takeSnapshot(dbMetrics, osMetrics);
+        registry.takeSnapshot(dbMetrics, clientMetrics);
 
         List<MetricsSnapshot> history = registry.getHistory();
         assertEquals(1, history.size());
@@ -116,7 +116,7 @@ class MetricsRegistryTest {
         assertNotNull(snapshot.getTimestamp());
         assertNotNull(snapshot.getTransactionMetrics());
         assertEquals(10, snapshot.getDatabaseMetrics().get("connections"));
-        assertEquals(50.0, snapshot.getOsMetrics().get("cpuUsage"));
+        assertEquals(50.0, snapshot.getClientMetrics().get("cpuUsage"));
     }
 
     @Test
@@ -131,9 +131,9 @@ class MetricsRegistryTest {
 
         MetricsSnapshot snapshot = history.get(0);
         assertNotNull(snapshot.getDatabaseMetrics());
-        assertNotNull(snapshot.getOsMetrics());
+        assertNotNull(snapshot.getClientMetrics());
         assertTrue(snapshot.getDatabaseMetrics().isEmpty());
-        assertTrue(snapshot.getOsMetrics().isEmpty());
+        assertTrue(snapshot.getClientMetrics().isEmpty());
     }
 
     @Test

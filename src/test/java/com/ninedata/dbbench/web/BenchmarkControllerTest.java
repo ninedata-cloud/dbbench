@@ -4,7 +4,7 @@ import com.ninedata.dbbench.config.BenchmarkConfig;
 import com.ninedata.dbbench.config.DatabaseConfig;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
-import com.ninedata.dbbench.metrics.OSMetricsCollector;
+import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -27,8 +27,8 @@ class BenchmarkControllerTest {
         dbConfig = new DatabaseConfig();
         BenchmarkConfig benchConfig = new BenchmarkConfig();
         MetricsRegistry metricsRegistry = new MetricsRegistry();
-        OSMetricsCollector osMetricsCollector = new OSMetricsCollector();
-        engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, osMetricsCollector);
+        ClientMetricsCollector clientMetricsCollector = new ClientMetricsCollector();
+        engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
         controller = new BenchmarkController(engine, dbConfig);
     }
 

@@ -3,7 +3,11 @@ package com.ninedata.dbbench.database;
 import com.ninedata.dbbench.config.DatabaseConfig;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -20,6 +24,43 @@ public class DB2Adapter extends AbstractDatabaseAdapter {
     @Override
     public String getDatabaseType() {
         return "DB2";
+    }
+
+    @Override
+    public boolean supportsCsvLoad() {
+        return true;
+    }
+
+    @Override
+    public void loadCsvFile(String tableName, String csvFilePath, String[] columns) throws SQLException {
+        String columnList = String.join(", ", columns);
+        String placeholders = String.join(", ", java.util.Collections.nCopies(columns.length, "?"));
+        String sql = "INSERT INTO " + tableName + " (" + columnList + ") VALUES (" + placeholders + ")";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             BufferedReader reader = new BufferedReader(new FileReader(csvFilePath))) {
+            String line;
+            int batch = 0;
+            while ((line = reader.readLine()) != null) {
+                String[] values = OracleAdapter.parseCsvLine(line);
+                for (int i = 0; i < columns.length && i < values.length; i++) {
+                    if ("\\N".equals(values[i])) {
+                        ps.setNull(i + 1, java.sql.Types.VARCHAR);
+                    } else {
+                        ps.setString(i + 1, values[i]);
+                    }
+                }
+                ps.addBatch();
+                if (++batch % 5000 == 0) {
+                    ps.executeBatch();
+                }
+            }
+            ps.executeBatch();
+            conn.commit();
+        } catch (IOException e) {
+            throw new SQLException("Failed to read CSV file: " + csvFilePath, e);
+        }
     }
 
     @Override

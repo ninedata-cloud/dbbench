@@ -75,7 +75,7 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.45.3.0</version>
         </dependency>
-        <!-- SAP HANA (provided - supply driver at runtime) -->
+        <!-- SAP HANA (provided - supply driver at runtime, see README) -->
         <dependency>
             <groupId>com.sap.cloud.db.jdbc</groupId>
             <artifactId>ngdbc</artifactId>
@@ -87,6 +87,30 @@
             <artifactId>yashandb-jdbc</artifactId>
             <version>1.7.10</version>
         </dependency>
+        <!-- OceanBase -->
+        <dependency>
+            <groupId>com.oceanbase</groupId>
+            <artifactId>oceanbase-client</artifactId>
+            <version>2.4.12</version>
+        </dependency>
+        <!-- GBase 8s (not in Maven Central - install manually, see README) -->
+        <!--
+        <dependency>
+            <groupId>com.gbasedbt</groupId>
+            <artifactId>gbasedbt-jdbc</artifactId>
+            <version>3.5.1</version>
+            <scope>provided</scope>
+        </dependency>
+        -->
+        <!-- Sybase ASE (not in Maven Central - install manually, see README) -->
+        <!--
+        <dependency>
+            <groupId>com.sybase</groupId>
+            <artifactId>jconn4</artifactId>
+            <version>16.0</version>
+            <scope>provided</scope>
+        </dependency>
+        -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>

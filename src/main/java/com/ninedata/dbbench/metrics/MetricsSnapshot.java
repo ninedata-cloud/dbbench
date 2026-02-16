@@ -8,5 +8,5 @@ public class MetricsSnapshot {
     private long timestamp;
     private Map<String, Object> transactionMetrics;
     private Map<String, Object> databaseMetrics;
-    private Map<String, Object> osMetrics;
+    private Map<String, Object> clientMetrics;
 }

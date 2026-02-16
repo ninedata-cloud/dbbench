@@ -2,14 +2,15 @@
 
 **开箱即用的 TPC-C 数据库基准测试工具**
 
-DBBench 是一款专业的数据库性能测试工具，完整实现 TPC-C 基准测试规范，支持 8 种主流数据库，提供实时 Web 监控面板。
+DBBench 是一款专业的数据库性能测试工具，完整实现 TPC-C 基准测试规范，支持 13 种主流数据库，提供实时 Web 监控面板。
 
 ## 镜像特点
 
 - **开箱即用**: 内置 PostgreSQL 17，无需额外配置数据库
-- **多数据库支持**: MySQL、PostgreSQL、Oracle、SQL Server、DB2、TiDB、OceanBase、达梦
+- **多数据库支持**: MySQL、PostgreSQL、Oracle、SQL Server、DB2、TiDB、OceanBase、达梦、SQLite、YashanDB、GBase8s、Sybase、SAP HANA
 - **实时监控**: Web UI 实时展示 TPS、延迟、CPU、内存、网络等指标
 - **完整 TPC-C**: 实现全部 5 种事务类型（New-Order、Payment、Order-Status、Delivery、Stock-Level）
+- **CSV 快速加载**: 支持数据库原生批量导入（MySQL LOAD DATA、PostgreSQL COPY 等），大幅提升数据加载速度
 - **灵活配置**: 支持环境变量配置，适配各种测试场景
 
 ## 快速开始
@@ -67,6 +68,8 @@ docker run -d -p 1929:1929 \
 | `BENCHMARK_WAREHOUSES` | 仓库数量（数据规模） | 10 |
 | `BENCHMARK_TERMINALS` | 并发终端数 | 50 |
 | `BENCHMARK_DURATION` | 测试时长（秒） | 60 |
+| `BENCHMARK_LOAD_CONCURRENCY` | 数据加载并发线程数 | 4 |
+| `BENCHMARK_CSV_LOAD` | 使用 CSV 快速加载（true/false） | false |
 | `JAVA_OPTS` | JVM 参数 | -Xms512m -Xmx1024m |
 
 ## 支持的数据库
@@ -81,6 +84,11 @@ docker run -d -p 1929:1929 \
 | TiDB | `jdbc:mysql://host:4000/database` |
 | OceanBase | `jdbc:oceanbase://host:2881/database` |
 | 达梦 | `jdbc:dm://host:5236/database` |
+| SQLite | `jdbc:sqlite:./tpcc.db` |
+| YashanDB | `jdbc:yasdb://host:1688/database` |
+| GBase8s | `jdbc:gbasedbt-sqli://host:9088/database:GBASEDBTSERVER=server` |
+| Sybase | `jdbc:sybase:Tds:host:5000/database` |
+| SAP HANA | `jdbc:sap://host:30015/?databaseName=database` |
 
 ## 使用流程
 

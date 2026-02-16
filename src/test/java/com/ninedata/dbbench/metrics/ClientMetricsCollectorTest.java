@@ -8,14 +8,14 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("OSMetricsCollector Tests")
-class OSMetricsCollectorTest {
+@DisplayName("ClientMetricsCollector Tests")
+class ClientMetricsCollectorTest {
 
-    private OSMetricsCollector collector;
+    private ClientMetricsCollector collector;
 
     @BeforeEach
     void setUp() {
-        collector = new OSMetricsCollector();
+        collector = new ClientMetricsCollector();
         collector.init();
     }
 
@@ -44,7 +44,6 @@ class OSMetricsCollectorTest {
         assertTrue(metrics.containsKey("memoryUsed"));
         assertTrue(metrics.containsKey("memoryFree"));
         assertTrue(metrics.containsKey("memoryUsage"));
-
         long memoryTotal = (Long) metrics.get("memoryTotal");
         long memoryUsed = (Long) metrics.get("memoryUsed");
         long memoryFree = (Long) metrics.get("memoryFree");
@@ -102,7 +101,6 @@ class OSMetricsCollectorTest {
         assertTrue(diskReadBytes >= 0, "Disk read bytes should be non-negative");
         assertTrue(diskWriteBytes >= 0, "Disk write bytes should be non-negative");
     }
-
     @Test
     @DisplayName("Should collect network I/O metrics")
     void testCollectNetworkMetrics() {

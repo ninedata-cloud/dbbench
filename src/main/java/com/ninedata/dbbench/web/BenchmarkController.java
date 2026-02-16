@@ -268,6 +268,64 @@ public class BenchmarkController {
         }
     }
 
+    @PostMapping("/test-ssh")
+    public ResponseEntity<Map<String, Object>> testSshConnection(@RequestBody Map<String, Object> config) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        SshMetricsCollector collector = null;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sshMap = (Map<String, Object>) config.get("ssh");
+            if (sshMap == null) sshMap = config;
+
+            DatabaseConfig.SshConfig sshCfg = new DatabaseConfig.SshConfig();
+            sshCfg.setEnabled(true);
+            sshCfg.setHost((String) sshMap.getOrDefault("host", ""));
+            sshCfg.setPort(((Number) sshMap.getOrDefault("port", 22)).intValue());
+            sshCfg.setUsername((String) sshMap.getOrDefault("username", "root"));
+
+            String password = (String) sshMap.get("password");
+            if (password != null && !password.isEmpty()) {
+                sshCfg.setPassword(password);
+            } else {
+                sshCfg.setPassword(dbConfig.getSsh().getPassword());
+            }
+            String privateKey = (String) sshMap.get("privateKey");
+            if (privateKey != null && !privateKey.isEmpty()) {
+                sshCfg.setPrivateKey(privateKey);
+            }
+
+            // Resolve effective host
+            String host = sshCfg.getHost();
+            if (host == null || host.isBlank()) {
+                String jdbcUrl = (String) ((Map<String, Object>) config.getOrDefault("database", Map.of())).getOrDefault("jdbcUrl", dbConfig.getJdbcUrl());
+                DatabaseConfig tmpCfg = new DatabaseConfig();
+                tmpCfg.setJdbcUrl(jdbcUrl);
+                tmpCfg.setSsh(sshCfg);
+                host = tmpCfg.getEffectiveSshHost();
+            }
+
+            long startTime = System.currentTimeMillis();
+            collector = new SshMetricsCollector(sshCfg, host);
+            collector.connect();
+            long elapsed = System.currentTimeMillis() - startTime;
+
+            response.put("success", true);
+            response.put("message", String.format("SSH connection successful (%dms)", elapsed));
+            response.put("host", host);
+            response.put("port", sshCfg.getPort());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("SSH connection test failed", e);
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } finally {
+            if (collector != null) {
+                collector.disconnect();
+            }
+        }
+    }
+
     /**
      * Get database-specific validation query
      * Different databases require different syntax for simple validation queries

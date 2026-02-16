@@ -3,6 +3,8 @@ package com.ninedata.dbbench.database;
 import com.ninedata.dbbench.config.DatabaseConfig;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,6 +22,26 @@ public class PostgreSQLAdapter extends AbstractDatabaseAdapter {
     @Override
     public String getDatabaseType() {
         return "PostgreSQL";
+    }
+
+    @Override
+    public boolean supportsCsvLoad() {
+        return true;
+    }
+
+    @Override
+    public void loadCsvFile(String tableName, String csvFilePath, String[] columns) throws SQLException {
+        String columnList = String.join(", ", columns);
+        String copySql = "COPY " + tableName + " (" + columnList + ") FROM STDIN WITH (FORMAT csv, NULL '\\N')";
+        try (Connection conn = getConnection()) {
+            org.postgresql.copy.CopyManager cm = conn.unwrap(org.postgresql.PGConnection.class).getCopyAPI();
+            try (FileInputStream fis = new FileInputStream(csvFilePath)) {
+                cm.copyIn(copySql, fis);
+            } catch (IOException e) {
+                throw new SQLException("Failed to read CSV file: " + csvFilePath, e);
+            }
+            conn.commit();
+        }
     }
 
     @Override

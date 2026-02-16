@@ -5,7 +5,7 @@ import com.ninedata.dbbench.config.DatabaseConfig;
 import com.ninedata.dbbench.database.DatabaseAdapter;
 import com.ninedata.dbbench.database.DatabaseFactory;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
-import com.ninedata.dbbench.metrics.OSMetricsCollector;
+import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -100,9 +100,9 @@ public class CLIRunner implements Callable<Integer> {
         System.out.println();
 
         MetricsRegistry metricsRegistry = new MetricsRegistry();
-        OSMetricsCollector osMetricsCollector = new OSMetricsCollector();
-        osMetricsCollector.init();
-        BenchmarkEngine engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, osMetricsCollector);
+        ClientMetricsCollector clientMetricsCollector = new ClientMetricsCollector();
+        clientMetricsCollector.init();
+        BenchmarkEngine engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
 
         try {
             // Initialize

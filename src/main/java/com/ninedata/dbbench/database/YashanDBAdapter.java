@@ -23,6 +23,11 @@ public class YashanDBAdapter extends OracleAdapter {
     }
 
     @Override
+    public boolean supportsCsvLoad() {
+        return false;
+    }
+
+    @Override
     public Map<String, Object> collectMetrics() throws SQLException {
         Map<String, Object> metrics = new HashMap<>();
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {

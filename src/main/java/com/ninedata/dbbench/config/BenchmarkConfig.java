@@ -14,6 +14,7 @@ public class BenchmarkConfig {
     private int rampup = 10;
     private boolean thinkTime = true;
     private int loadConcurrency = 4;
+    private boolean useCsvLoad = false;
     private MixConfig mix = new MixConfig();
 
     @Data

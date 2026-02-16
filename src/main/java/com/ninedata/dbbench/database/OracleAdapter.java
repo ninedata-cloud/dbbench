@@ -3,7 +3,11 @@ package com.ninedata.dbbench.database;
 import com.ninedata.dbbench.config.DatabaseConfig;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -14,6 +18,80 @@ import java.util.Map;
 public class OracleAdapter extends AbstractDatabaseAdapter {
     public OracleAdapter(DatabaseConfig config) { super(config); }
     @Override public String getDatabaseType() { return "Oracle"; }
+
+    @Override
+    public boolean supportsCsvLoad() {
+        return true;
+    }
+
+    @Override
+    public void loadCsvFile(String tableName, String csvFilePath, String[] columns) throws SQLException {
+        String columnList = String.join(", ", columns);
+        String placeholders = String.join(", ", java.util.Collections.nCopies(columns.length, "?"));
+        String sql = "INSERT /*+ APPEND_VALUES*/ INTO " + tableName + " (" + columnList + ") VALUES (" + placeholders + ")";
+
+        try (Connection conn = getConnection()) {
+            // Match CSV timestamp format "yyyy-MM-dd HH:mm:ss" for implicit string-to-DATE conversion
+            try (Statement nls = conn.createStatement()) {
+                nls.execute("ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'");
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 BufferedReader reader = new BufferedReader(new FileReader(csvFilePath))) {
+                String line;
+                int batch = 0;
+                while ((line = reader.readLine()) != null) {
+                    String[] values = parseCsvLine(line);
+                    for (int i = 0; i < columns.length && i < values.length; i++) {
+                        if ("\\N".equals(values[i])) {
+                            ps.setNull(i + 1, java.sql.Types.VARCHAR);
+                        } else {
+                            ps.setString(i + 1, values[i]);
+                        }
+                    }
+                    ps.addBatch();
+                    if (++batch % 1000 == 0) {
+                        ps.executeBatch();
+                        conn.commit();
+                    }
+                }
+                ps.executeBatch();
+                conn.commit();
+            }
+        } catch (IOException e) {
+            throw new SQLException("Failed to read CSV file: " + csvFilePath, e);
+        }
+    }
+
+    /** Simple CSV line parser handling quoted fields */
+    protected static String[] parseCsvLine(String line) {
+        java.util.List<String> fields = new java.util.ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inQuotes) {
+                if (c == '"') {
+                    if (i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                        sb.append('"');
+                        i++;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    sb.append(c);
+                }
+            } else if (c == '"') {
+                inQuotes = true;
+            } else if (c == ',') {
+                fields.add(sb.toString());
+                sb.setLength(0);
+            } else {
+                sb.append(c);
+            }
+        }
+        fields.add(sb.toString());
+        return fields.toArray(new String[0]);
+    }
 
     @Override
     public boolean supportsLimitSyntax() {
@@ -91,8 +169,8 @@ public class OracleAdapter extends AbstractDatabaseAdapter {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
             // Oracle V$OSSTAT provides OS-level metrics
             String sql = """
-            SELECT 
-                (SELECT VALUE FROM V$SYSMETRIC WHERE METRIC_NAME = 'Host CPU Utilization (%)') AS CPU_USAGE,
+            SELECT
+                (SELECT VALUE FROM V$SYSMETRIC WHERE METRIC_NAME = 'Host CPU Utilization (%)' AND GROUP_ID = 2 AND ROWNUM = 1) AS CPU_USAGE,
                 (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'NUM_CPUS') AS CPU_CORES,
                 (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'PHYSICAL_MEMORY_BYTES') AS MEM_TOTAL,
                 (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'FREE_MEMORY_BYTES') AS MEM_FREE
@@ -140,6 +218,23 @@ public class OracleAdapter extends AbstractDatabaseAdapter {
                 rs.close();
             } catch (SQLException e) {
                 log.debug("Could not get I/O stats: {}", e.getMessage());
+            }
+
+            // Network statistics from SQL*Net
+            try {
+                ResultSet rs = stmt.executeQuery("""
+                    SELECT SUM(CASE WHEN name LIKE 'bytes received via%' THEN value ELSE 0 END) AS bytes_recv,
+                           SUM(CASE WHEN name LIKE 'bytes sent via%' THEN value ELSE 0 END) AS bytes_sent
+                    FROM V$SYSSTAT
+                    WHERE name LIKE 'bytes%via SQL*Net%'
+                """);
+                if (rs.next()) {
+                    metrics.put("networkRecvBytes", rs.getLong("bytes_recv"));
+                    metrics.put("networkSentBytes", rs.getLong("bytes_sent"));
+                }
+                rs.close();
+            } catch (SQLException e) {
+                log.debug("Could not get network stats: {}", e.getMessage());
             }
 
             conn.commit();

@@ -4,11 +4,14 @@ import com.ninedata.dbbench.database.DatabaseAdapter;
 import com.ninedata.dbbench.tpcc.TPCCUtil;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
+import java.nio.file.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -16,23 +19,43 @@ public class TPCCLoader {
     private final DatabaseAdapter adapter;
     private final int warehouses;
     private final int concurrency;
+    private final boolean useCsvLoad;
     private Consumer<String> progressCallback;
+    private BiConsumer<Integer, String> structuredProgressCallback;
     private final AtomicInteger completedWarehouses = new AtomicInteger(0);
     private volatile boolean cancelled = false;
     private ExecutorService executor;
 
     public TPCCLoader(DatabaseAdapter adapter, int warehouses) {
-        this(adapter, warehouses, 4);
+        this(adapter, warehouses, 4, false);
     }
 
     public TPCCLoader(DatabaseAdapter adapter, int warehouses, int concurrency) {
+        this(adapter, warehouses, concurrency, false);
+    }
+
+    public TPCCLoader(DatabaseAdapter adapter, int warehouses, int concurrency, boolean useCsvLoad) {
         this.adapter = adapter;
         this.warehouses = warehouses;
         this.concurrency = Math.max(1, Math.min(concurrency, warehouses));
+        // Auto-degrade: only use CSV if adapter supports it
+        this.useCsvLoad = useCsvLoad && adapter.supportsCsvLoad();
+        if (useCsvLoad && !this.useCsvLoad) {
+            log.info("CSV load requested but {} does not support it, falling back to batch insert",
+                    adapter.getDatabaseType());
+        }
     }
 
     public void setProgressCallback(Consumer<String> callback) {
         this.progressCallback = callback;
+    }
+
+    /**
+     * Set structured progress callback that receives (percent 0-100, message).
+     * When set, TPCCLoader computes accurate progress internally.
+     */
+    public void setStructuredProgressCallback(BiConsumer<Integer, String> callback) {
+        this.structuredProgressCallback = callback;
     }
 
     /**
@@ -66,21 +89,34 @@ public class TPCCLoader {
         }
     }
 
+    private void reportProgress(int percent, String message) {
+        log.info("[{}%] {}", percent, message);
+        if (structuredProgressCallback != null) {
+            structuredProgressCallback.accept(percent, message);
+        }
+        if (progressCallback != null) {
+            progressCallback.accept(message);
+        }
+    }
+
     public void load() throws SQLException {
         cancelled = false;
         long start = System.currentTimeMillis();
-        reportProgress(String.format("Starting TPC-C data load for %d warehouse(s) with %d concurrent threads...",
-                warehouses, concurrency));
 
-        // Load items first (shared across all warehouses)
-        loadItems();
-        checkCancelled();
-
-        // Load warehouses concurrently
-        loadWarehousesConcurrently();
+        if (useCsvLoad) {
+            reportProgress(0, String.format("Starting TPC-C CSV fast load for %d warehouse(s) with %d concurrent threads...",
+                    warehouses, concurrency));
+            loadViaCsv();
+        } else {
+            reportProgress(0, String.format("Starting TPC-C data load for %d warehouse(s) with %d concurrent threads...",
+                    warehouses, concurrency));
+            loadItems();
+            checkCancelled();
+            loadWarehousesConcurrently();
+        }
 
         long elapsed = (System.currentTimeMillis() - start) / 1000;
-        reportProgress("Data load completed in " + elapsed + " seconds");
+        reportProgress(100, "Data load completed in " + elapsed + " seconds");
     }
 
     private void loadWarehousesConcurrently() throws SQLException {
@@ -88,7 +124,7 @@ public class TPCCLoader {
         List<Future<Void>> futures = new ArrayList<>();
         completedWarehouses.set(0);
 
-        reportProgress(String.format("Loading %d warehouses with %d parallel threads...", warehouses, concurrency));
+        reportProgress(10, String.format("Loading %d warehouses with %d parallel threads...", warehouses, concurrency));
 
         for (int w = 1; w <= warehouses; w++) {
             final int warehouseId = w;
@@ -98,7 +134,8 @@ public class TPCCLoader {
                     loadSingleWarehouse(warehouseId);
                     if (!cancelled) {
                         int completed = completedWarehouses.incrementAndGet();
-                        reportProgress(String.format("Warehouse %d completed (%d/%d)", warehouseId, completed, warehouses));
+                        int pct = 10 + (int) ((completed * 85.0) / warehouses);
+                        reportProgress(pct, String.format("Warehouse %d completed (%d/%d)", warehouseId, completed, warehouses));
                     }
                 } catch (SQLException e) {
                     if (!cancelled) {
@@ -381,6 +418,129 @@ public class TPCCLoader {
                 }
             }
             conn.commit();
+        }
+    }
+
+    // ==================== CSV Fast Load ====================
+
+    private void loadViaCsv() throws SQLException {
+        Path tmpDir;
+        try {
+            tmpDir = Files.createTempDirectory("dbbench-csv-");
+        } catch (IOException e) {
+            throw new SQLException("Failed to create temp directory for CSV files", e);
+        }
+
+        try {
+            CsvDataWriter csvWriter = new CsvDataWriter(tmpDir);
+
+            // Phase 1: Generate CSV files concurrently
+            reportProgress("Generating CSV files...");
+            generateCsvFiles(csvWriter);
+            checkCancelled();
+
+            // Phase 2: Import CSV files into database table by table
+            reportProgress("Importing CSV files into database...");
+            importCsvFiles(csvWriter);
+
+        } finally {
+            // Cleanup temp files
+            try {
+                try (var stream = Files.walk(tmpDir)) {
+                    stream.sorted(java.util.Comparator.reverseOrder())
+                            .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
+                }
+            } catch (IOException e) {
+                log.warn("Failed to clean up temp CSV directory: {}", tmpDir);
+            }
+        }
+    }
+
+    private void generateCsvFiles(CsvDataWriter csvWriter) throws SQLException {
+        // Generate items CSV (single file)
+        try {
+            reportProgress("Generating item CSV...");
+            csvWriter.writeItems();
+            reportProgress("Item CSV generated: " + TPCCUtil.ITEMS + " rows");
+        } catch (IOException e) {
+            throw new SQLException("Failed to generate item CSV", e);
+        }
+        checkCancelled();
+
+        // Generate per-warehouse CSVs concurrently
+        executor = Executors.newFixedThreadPool(concurrency);
+        List<Future<Void>> futures = new ArrayList<>();
+        completedWarehouses.set(0);
+
+        for (int w = 1; w <= warehouses; w++) {
+            final int wId = w;
+            futures.add(executor.submit(() -> {
+                if (cancelled) return null;
+                try {
+                    csvWriter.writeWarehouse(wId);
+                    csvWriter.writeDistricts(wId);
+                    csvWriter.writeCustomers(wId);
+                    csvWriter.writeStock(wId);
+                    csvWriter.writeOrders(wId);
+                    int done = completedWarehouses.incrementAndGet();
+                    reportProgress(String.format("CSV generated for warehouse %d (%d/%d)", wId, done, warehouses));
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to generate CSV for warehouse " + wId, e);
+                }
+                return null;
+            }));
+        }
+
+        executor.shutdown();
+        try {
+            for (Future<Void> f : futures) {
+                if (cancelled) break;
+                f.get();
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            if (!cancelled) throw new SQLException("CSV generation failed", e);
+        }
+        checkCancelled();
+        reportProgress("All CSV files generated");
+    }
+    private void importCsvFiles(CsvDataWriter csvWriter) throws SQLException {
+        // Import items
+        reportProgress("Importing items...");
+        adapter.loadCsvFile("item", csvWriter.getFilePath("item"), CsvDataWriter.ITEM_COLUMNS);
+        checkCancelled();
+
+        // Table import order and their column definitions
+        String[][] tableInfo = {
+                {"warehouse", null},
+                {"district", null},
+                {"customer", null},
+                {"history", null},
+                {"stock", null},
+                {"oorder", null},
+                {"new_order", null},
+                {"order_line", null}
+        };
+        String[][] columnArrays = {
+                CsvDataWriter.WAREHOUSE_COLUMNS,
+                CsvDataWriter.DISTRICT_COLUMNS,
+                CsvDataWriter.CUSTOMER_COLUMNS,
+                CsvDataWriter.HISTORY_COLUMNS,
+                CsvDataWriter.STOCK_COLUMNS,
+                CsvDataWriter.ORDER_COLUMNS,
+                CsvDataWriter.NEW_ORDER_COLUMNS,
+                CsvDataWriter.ORDER_LINE_COLUMNS
+        };
+
+        for (int t = 0; t < tableInfo.length; t++) {
+            String tableName = tableInfo[t][0];
+            String[] columns = columnArrays[t];
+            reportProgress("Importing " + tableName + "...");
+
+            for (int w = 1; w <= warehouses; w++) {
+                checkCancelled();
+                adapter.loadCsvFile(tableName, csvWriter.getFilePath(tableName, w), columns);
+            }
+            reportProgress(tableName + " imported for all warehouses");
         }
     }
 }

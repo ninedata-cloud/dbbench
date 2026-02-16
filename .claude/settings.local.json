@@ -8,7 +8,14 @@
       "Bash(java -jar:*)",
       "Bash(pkill:*)",
       "Bash(git commit:*)",
-      "Bash(gh repo create:*)"
+      "Bash(gh repo create:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn test:*)",
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(grep:*)"
     ]
   }
 }
