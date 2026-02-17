@@ -127,7 +127,7 @@ public class BenchmarkEngine {
             if (bench.containsKey("duration")) benchConfig.setDuration(((Number) bench.get("duration")).intValue());
             if (bench.containsKey("thinkTime")) benchConfig.setThinkTime((Boolean) bench.get("thinkTime"));
             if (bench.containsKey("loadConcurrency")) benchConfig.setLoadConcurrency(((Number) bench.get("loadConcurrency")).intValue());
-            if (bench.containsKey("useCsvLoad")) benchConfig.setUseCsvLoad(Boolean.TRUE.equals(bench.get("useCsvLoad")));
+            if (bench.containsKey("loadMode")) benchConfig.setLoadMode((String) bench.get("loadMode"));
         }
 
         // Update transaction mix
@@ -280,7 +280,7 @@ public class BenchmarkEngine {
             progressCallback.accept("Creating schema...");
             adapter.createSchema();
 
-            TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.isUseCsvLoad());
+            TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.getLoadMode());
             currentLoader = loader;
             loader.setProgressCallback(progressCallback);
             loader.load();
@@ -328,7 +328,7 @@ public class BenchmarkEngine {
                 adapter.createSchema();
                 addLog("INFO", "Schema created successfully");
 
-                TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.isUseCsvLoad());
+                TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.getLoadMode());
                 currentLoader = loader;
                 loader.setProgressCallback(msg -> {
                     addLog("INFO", msg);
@@ -683,7 +683,7 @@ public class BenchmarkEngine {
         bench.put("rampup", benchConfig.getRampup());
         bench.put("thinkTime", benchConfig.isThinkTime());
         bench.put("loadConcurrency", benchConfig.getLoadConcurrency());
-        bench.put("useCsvLoad", benchConfig.isUseCsvLoad());
+        bench.put("loadMode", benchConfig.getLoadMode());
         config.put("benchmark", bench);
 
         // Transaction mix

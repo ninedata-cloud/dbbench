@@ -20,6 +20,7 @@ public class TPCCLoader {
     private final int warehouses;
     private final int concurrency;
     private final boolean useCsvLoad;
+    private final String loadMode;
     private Consumer<String> progressCallback;
     private BiConsumer<Integer, String> structuredProgressCallback;
     private final AtomicInteger completedWarehouses = new AtomicInteger(0);
@@ -27,22 +28,36 @@ public class TPCCLoader {
     private ExecutorService executor;
 
     public TPCCLoader(DatabaseAdapter adapter, int warehouses) {
-        this(adapter, warehouses, 4, false);
+        this(adapter, warehouses, 4, "auto");
     }
 
     public TPCCLoader(DatabaseAdapter adapter, int warehouses, int concurrency) {
-        this(adapter, warehouses, concurrency, false);
+        this(adapter, warehouses, concurrency, "auto");
     }
 
-    public TPCCLoader(DatabaseAdapter adapter, int warehouses, int concurrency, boolean useCsvLoad) {
+    public TPCCLoader(DatabaseAdapter adapter, int warehouses, int concurrency, String loadMode) {
         this.adapter = adapter;
         this.warehouses = warehouses;
         this.concurrency = Math.max(1, Math.min(concurrency, warehouses));
-        // Auto-degrade: only use CSV if adapter supports it
-        this.useCsvLoad = useCsvLoad && adapter.supportsCsvLoad();
-        if (useCsvLoad && !this.useCsvLoad) {
-            log.info("CSV load requested but {} does not support it, falling back to batch insert",
-                    adapter.getDatabaseType());
+        this.loadMode = loadMode != null ? loadMode.toLowerCase() : "auto";
+
+        // Resolve effective useCsvLoad based on loadMode and adapter capability
+        if ("csv".equals(this.loadMode)) {
+            if (adapter.supportsCsvLoad()) {
+                this.useCsvLoad = true;
+            } else {
+                this.useCsvLoad = false;
+                log.warn("CSV load mode requested but {} does not support it, falling back to batch insert",
+                        adapter.getDatabaseType());
+            }
+        } else if ("batch".equals(this.loadMode)) {
+            this.useCsvLoad = false;
+        } else {
+            // auto: use CSV if adapter supports it
+            this.useCsvLoad = adapter.supportsCsvLoad();
+            if (this.useCsvLoad) {
+                log.info("Auto-detected CSV load support for {}, using fast CSV loading", adapter.getDatabaseType());
+            }
         }
     }
 

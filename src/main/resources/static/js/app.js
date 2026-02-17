@@ -814,7 +814,7 @@ function displayConfig(cfg) {
         document.getElementById('cfgTerminals').textContent = cfg.benchmark.terminals || '-';
         document.getElementById('cfgDuration').textContent = (cfg.benchmark.duration || '-') + 's';
         document.getElementById('cfgLoadConcurrency').textContent = cfg.benchmark.loadConcurrency || '-';
-        document.getElementById('cfgCsvLoad').textContent = cfg.benchmark.useCsvLoad ? 'On' : 'Off';
+        document.getElementById('cfgLoadMode').textContent = cfg.benchmark.loadMode || 'auto';
     }
 
     if (cfg.transactionMix) {
@@ -862,7 +862,7 @@ function openConfigModal() {
     document.getElementById('cfgFormDuration').value = cfg.benchmark?.duration || 60;
     document.getElementById('cfgFormLoadConcurrency').value = cfg.benchmark?.loadConcurrency || 4;
     document.getElementById('cfgFormThinkTime').checked = cfg.benchmark?.thinkTime || false;
-    document.getElementById('cfgFormUseCsvLoad').checked = cfg.benchmark?.useCsvLoad || false;
+    document.getElementById('cfgFormLoadMode').value = cfg.benchmark?.loadMode || 'auto';
 
     // Transaction mix
     document.getElementById('cfgFormMixNewOrder').value = cfg.transactionMix?.newOrder || 45;
@@ -906,7 +906,7 @@ async function saveConfig() {
             duration: parseInt(document.getElementById('cfgFormDuration').value),
             loadConcurrency: isSqlite ? 1 : parseInt(document.getElementById('cfgFormLoadConcurrency').value),
             thinkTime: document.getElementById('cfgFormThinkTime').checked,
-            useCsvLoad: document.getElementById('cfgFormUseCsvLoad').checked
+            loadMode: document.getElementById('cfgFormLoadMode').value
         },
         transactionMix: {
             newOrder: parseInt(document.getElementById('cfgFormMixNewOrder').value),

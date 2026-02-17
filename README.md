@@ -313,9 +313,9 @@ Per warehouse (approximately):
 | Stock | 100,000 |
 
 **Recommended sizing:**
-- Small test: 1-2 warehouses, 5-10 terminals
-- Medium test: 10 warehouses, 50 terminals
-- Large test: 100+ warehouses, 200+ terminals
+- Small test: 1-10 warehouses, 5-10 terminals
+- Medium test: 10~1000 warehouses, 50 terminals
+- Large test: 1000+ warehouses, 200+ terminals
 
 ## Screenshots
 

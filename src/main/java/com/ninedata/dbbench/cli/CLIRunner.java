@@ -48,6 +48,9 @@ public class CLIRunner implements Callable<Integer> {
     @Option(names = {"--load-threads"}, description = "Number of parallel threads for data loading", defaultValue = "4")
     private int loadConcurrency;
 
+    @Option(names = {"--load-mode"}, description = "Data loading mode: auto (default, use CSV if supported), csv (force CSV), batch (force INSERT batch)", defaultValue = "auto")
+    private String loadMode;
+
     // Run mode options
     @Option(names = {"--load-only"}, description = "Only load data, don't run benchmark")
     private boolean loadOnly;
@@ -86,6 +89,7 @@ public class CLIRunner implements Callable<Integer> {
         benchConfig.setTerminals(terminals);
         benchConfig.setDuration(duration);
         benchConfig.setLoadConcurrency(loadConcurrency);
+        benchConfig.setLoadMode(loadMode);
 
         System.out.println("Configuration:");
         System.out.printf("  Database Type: %s%n", dbType.toUpperCase());
@@ -97,6 +101,7 @@ public class CLIRunner implements Callable<Integer> {
         System.out.printf("  Terminals:     %d%n", terminals);
         System.out.printf("  Duration:      %ds%n", duration);
         System.out.printf("  Load Threads:  %d%n", loadConcurrency);
+        System.out.printf("  Load Mode:     %s%n", loadMode);
         System.out.println();
 
         MetricsRegistry metricsRegistry = new MetricsRegistry();

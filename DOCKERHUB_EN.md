@@ -144,25 +144,28 @@ docker run -d -p 1929:1929 -p 5432:5432 --name dbbench yzsind/dbbench:latest
 | `/api/benchmark/status` | GET | Get current status |
 | `/api/metrics/current` | GET | Get real-time metrics |
 
-## Metrics
+## Metrics Collected
 
 ### Transaction Metrics
-- TPS (Transactions Per Second)
-- Success / Failure rate
-- Average / Max / Min latency
-- Per-transaction type statistics
-
-### System Metrics
-- CPU usage
-- Memory usage
-- Network I/O
-- Disk I/O
+- Throughput (TPS)
+- Total transactions count
+- Success/Failure counts and rates
+- Latency (average, min, max)
+- Per-transaction type breakdown
 
 ### Database Metrics
 - Active connections
-- Cache hit ratio
+- Buffer pool / Cache hit ratio
 - Row lock waits
-- Slow query count
+- Slow queries count
+
+### Client Metrics (Local Machine)
+- CPU usage (%)
+- Memory usage (%)
+- Load average (1m, 5m, 15m)
+- Network I/O (bytes/sec)
+- Disk I/O (bytes/sec)
+
 
 ## Source Code & Documentation
 

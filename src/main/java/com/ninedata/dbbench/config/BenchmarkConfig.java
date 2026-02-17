@@ -14,7 +14,10 @@ public class BenchmarkConfig {
     private int rampup = 10;
     private boolean thinkTime = true;
     private int loadConcurrency = 4;
-    private boolean useCsvLoad = false;
+    /**
+     * Data loading mode: "auto" (default) uses CSV if DB supports it, "csv" forces CSV, "batch" forces INSERT batch.
+     */
+    private String loadMode = "auto";
     private MixConfig mix = new MixConfig();
 
     @Data

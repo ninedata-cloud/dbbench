@@ -54,7 +54,7 @@
                     <div class="config-item"><span class="config-label">Terminals</span><span class="config-value" id="cfgTerminals">-</span></div>
                     <div class="config-item"><span class="config-label">Duration</span><span class="config-value" id="cfgDuration">-</span></div>
                     <div class="config-item"><span class="config-label">Load Threads</span><span class="config-value" id="cfgLoadConcurrency">-</span></div>
-                    <div class="config-item"><span class="config-label">CSV Load</span><span class="config-value" id="cfgCsvLoad">-</span></div>
+                    <div class="config-item"><span class="config-label">Load Mode</span><span class="config-value" id="cfgLoadMode">-</span></div>
                 </div>
                 <div style="margin-top: 10px;">
                     <span class="config-label">JDBC URL:</span>
@@ -390,10 +390,12 @@
                         </label>
                     </div>
                     <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                            <input type="checkbox" id="cfgFormUseCsvLoad" style="width: auto;">
-                            CSV Fast Load (uses database-native bulk import for faster data loading)
-                        </label>
+                        <label>Load Mode</label>
+                        <select id="cfgFormLoadMode">
+                            <option value="auto">Auto (use CSV if supported)</option>
+                            <option value="csv">CSV (force bulk import)</option>
+                            <option value="batch">Batch (force INSERT batch)</option>
+                        </select>
                     </div>
                 </div>
 
