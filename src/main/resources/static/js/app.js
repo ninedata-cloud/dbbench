@@ -13,7 +13,17 @@ let dbMemChart = null;
 let dbDiskChart = null;
 let dbNetChart = null;
 let dbConnChart = null;
-const maxDataPoints = 60;
+let chartTimeRange = 'all';
+const chartDataBuffer = {
+    tps:     { labels: [], timestamps: [], data: [] },
+    cpu:     { labels: [], timestamps: [], data: [] },
+    network: { labels: [], timestamps: [], recvData: [], sentData: [] },
+    dbCpu:   { labels: [], timestamps: [], data: [] },
+    dbMem:   { labels: [], timestamps: [], data: [] },
+    dbDisk:  { labels: [], timestamps: [], readData: [], writeData: [] },
+    dbNet:   { labels: [], timestamps: [], recvData: [], sentData: [] },
+    dbConn:  { labels: [], timestamps: [], data: [] }
+};
 let currentConfig = null;
 let savedDbPassword = '';
 let savedSshPassword = '';
@@ -97,20 +107,80 @@ async function loadInitialState() {
 
 async function restoreChartHistory() {
     try {
-        const res = await fetch('/api/metrics/tps-history?limit=60');
+        const res = await fetch('/api/metrics/history?limit=3600');
         const history = await res.json();
 
         if (history && history.length > 0) {
-            tpsChart.data.labels = [];
-            tpsChart.data.datasets[0].data = [];
+            // Clear all buffers
+            for (const buf of Object.values(chartDataBuffer)) {
+                for (const key of Object.keys(buf)) { buf[key] = []; }
+            }
 
-            history.forEach(point => {
-                const time = new Date(point.timestamp).toLocaleTimeString();
-                tpsChart.data.labels.push(time);
-                tpsChart.data.datasets[0].data.push(point.tps || 0);
+            history.forEach(snapshot => {
+                const time = new Date(snapshot.timestamp).toLocaleTimeString();
+                const ts = new Date(snapshot.timestamp).getTime();
+                const tx = snapshot.transactionMetrics || {};
+                const client = snapshot.clientMetrics || {};
+                const db = snapshot.databaseMetrics || {};
+                const host = snapshot.dbHostMetrics || {};
+
+                // TPS
+                chartDataBuffer.tps.labels.push(time);
+                chartDataBuffer.tps.timestamps.push(ts);
+                chartDataBuffer.tps.data.push(tx.tps || 0);
+
+                // Client CPU
+                chartDataBuffer.cpu.labels.push(time);
+                chartDataBuffer.cpu.timestamps.push(ts);
+                chartDataBuffer.cpu.data.push(client.cpuUsage || 0);
+
+                // Client Network
+                chartDataBuffer.network.labels.push(time);
+                chartDataBuffer.network.timestamps.push(ts);
+                chartDataBuffer.network.recvData.push(client.networkRecvBytesPerSec || 0);
+                chartDataBuffer.network.sentData.push(client.networkSentBytesPerSec || 0);
+
+                // DB CPU
+                if (host.cpuUsage !== undefined) {
+                    chartDataBuffer.dbCpu.labels.push(time);
+                    chartDataBuffer.dbCpu.timestamps.push(ts);
+                    chartDataBuffer.dbCpu.data.push(host.cpuUsage);
+                }
+
+                // DB Buffer Pool Hit Ratio
+                const hitRatio = db.buffer_pool_hit_ratio || db.cache_hit_ratio || db.plan_cache_hit_ratio;
+                if (hitRatio !== undefined) {
+                    chartDataBuffer.dbMem.labels.push(time);
+                    chartDataBuffer.dbMem.timestamps.push(ts);
+                    chartDataBuffer.dbMem.data.push(hitRatio);
+                }
+
+                // DB Disk I/O
+                if (host.diskReadBytesPerSec !== undefined) {
+                    chartDataBuffer.dbDisk.labels.push(time);
+                    chartDataBuffer.dbDisk.timestamps.push(ts);
+                    chartDataBuffer.dbDisk.readData.push(host.diskReadBytesPerSec);
+                    chartDataBuffer.dbDisk.writeData.push(host.diskWriteBytesPerSec || 0);
+                }
+
+                // DB Network I/O
+                if (host.networkRecvBytesPerSec !== undefined) {
+                    chartDataBuffer.dbNet.labels.push(time);
+                    chartDataBuffer.dbNet.timestamps.push(ts);
+                    chartDataBuffer.dbNet.recvData.push(host.networkRecvBytesPerSec);
+                    chartDataBuffer.dbNet.sentData.push(host.networkSentBytesPerSec || 0);
+                }
+
+                // DB Connections
+                const conn = db.active_connections || db.activeConnections;
+                if (conn !== undefined) {
+                    chartDataBuffer.dbConn.labels.push(time);
+                    chartDataBuffer.dbConn.timestamps.push(ts);
+                    chartDataBuffer.dbConn.data.push(conn);
+                }
             });
 
-            tpsChart.update();
+            applyTimeRange();
             addLog(`Restored ${history.length} chart data points`, 'info');
         }
     } catch (e) {
@@ -160,8 +230,9 @@ function initCharts() {
                 backgroundColor: 'rgba(0, 217, 255, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 4
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                borderWidth: 1.5
             }]
         },
         options: {
@@ -189,8 +260,9 @@ function initCharts() {
                 backgroundColor: 'rgba(255, 107, 107, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 4
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                borderWidth: 1.5
             }]
         },
         options: {
@@ -219,8 +291,9 @@ function initCharts() {
                     backgroundColor: 'rgba(0, 255, 136, 0.1)',
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 },
                 {
                     label: 'Sent',
@@ -229,8 +302,9 @@ function initCharts() {
                     backgroundColor: 'rgba(255, 165, 0, 0.1)',
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 }
             ]
         },
@@ -272,8 +346,9 @@ function initCharts() {
                 backgroundColor: 'rgba(255, 107, 107, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 4
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                borderWidth: 1.5
             }]
         },
         options: {
@@ -301,8 +376,9 @@ function initCharts() {
                 backgroundColor: 'rgba(46, 204, 113, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 4
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                borderWidth: 1.5
             }]
         },
         options: {
@@ -331,8 +407,9 @@ function initCharts() {
                     backgroundColor: 'rgba(52, 152, 219, 0.1)',
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 },
                 {
                     label: 'Write',
@@ -341,8 +418,9 @@ function initCharts() {
                     backgroundColor: 'rgba(231, 76, 60, 0.1)',
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 }
             ]
         },
@@ -385,8 +463,9 @@ function initCharts() {
                     backgroundColor: 'rgba(26, 188, 156, 0.1)',
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 },
                 {
                     label: 'Sent',
@@ -395,8 +474,9 @@ function initCharts() {
                     backgroundColor: 'rgba(230, 126, 34, 0.1)',
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 }
             ]
         },
@@ -439,8 +519,9 @@ function initCharts() {
                     backgroundColor: 'rgba(0, 217, 255, 0.1)',
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 2,
-                    pointHoverRadius: 4
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    borderWidth: 1.5
                 }
             ]
         },
@@ -537,16 +618,11 @@ function updateMetrics(data) {
         // Update chart - only when benchmark is running
         if (data.status === 'RUNNING' && tx.tps !== undefined) {
             const now = new Date().toLocaleTimeString();
-            tpsChart.data.labels.push(now);
-            tpsChart.data.datasets[0].data.push(tx.tps || 0);
-
-            // Keep max 60 data points
-            if (tpsChart.data.labels.length > maxDataPoints) {
-                tpsChart.data.labels.shift();
-                tpsChart.data.datasets[0].data.shift();
-            }
-
-            tpsChart.update();
+            const ts = Date.now();
+            chartDataBuffer.tps.labels.push(now);
+            chartDataBuffer.tps.timestamps.push(ts);
+            chartDataBuffer.tps.data.push(tx.tps || 0);
+            applyTimeRangeToChart('tps');
         }
 
         // Update transaction table
@@ -576,26 +652,20 @@ function updateMetrics(data) {
 
         // Always update CPU and Network charts for continuous monitoring
         const now = new Date().toLocaleTimeString();
+        const ts = Date.now();
 
         // CPU chart
-        cpuChart.data.labels.push(now);
-        cpuChart.data.datasets[0].data.push(client.cpuUsage || 0);
-        if (cpuChart.data.labels.length > maxDataPoints) {
-            cpuChart.data.labels.shift();
-            cpuChart.data.datasets[0].data.shift();
-        }
-        cpuChart.update();
+        chartDataBuffer.cpu.labels.push(now);
+        chartDataBuffer.cpu.timestamps.push(ts);
+        chartDataBuffer.cpu.data.push(client.cpuUsage || 0);
+        applyTimeRangeToChart('cpu');
 
         // Network chart
-        networkChart.data.labels.push(now);
-        networkChart.data.datasets[0].data.push(client.networkRecvBytesPerSec || 0);
-        networkChart.data.datasets[1].data.push(client.networkSentBytesPerSec || 0);
-        if (networkChart.data.labels.length > maxDataPoints) {
-            networkChart.data.labels.shift();
-            networkChart.data.datasets[0].data.shift();
-            networkChart.data.datasets[1].data.shift();
-        }
-        networkChart.update();
+        chartDataBuffer.network.labels.push(now);
+        chartDataBuffer.network.timestamps.push(ts);
+        chartDataBuffer.network.recvData.push(client.networkRecvBytesPerSec || 0);
+        chartDataBuffer.network.sentData.push(client.networkSentBytesPerSec || 0);
+        applyTimeRangeToChart('network');
     }
 
     if (data.database) {
@@ -605,27 +675,21 @@ function updateMetrics(data) {
 
         // Update database connections chart
         const now = new Date().toLocaleTimeString();
+        const ts = Date.now();
         const connections = db.active_connections || db.activeConnections || 0;
 
-        dbConnChart.data.labels.push(now);
-        dbConnChart.data.datasets[0].data.push(connections);
-
-        if (dbConnChart.data.labels.length > maxDataPoints) {
-            dbConnChart.data.labels.shift();
-            dbConnChart.data.datasets[0].data.shift();
-        }
-        dbConnChart.update();
+        chartDataBuffer.dbConn.labels.push(now);
+        chartDataBuffer.dbConn.timestamps.push(ts);
+        chartDataBuffer.dbConn.data.push(connections);
+        applyTimeRangeToChart('dbConn');
 
         // Buffer Pool Hit Ratio Chart
         const hitRatio = db.buffer_pool_hit_ratio || db.cache_hit_ratio || db.plan_cache_hit_ratio;
         if (hitRatio !== undefined) {
-            dbMemChart.data.labels.push(now);
-            dbMemChart.data.datasets[0].data.push(hitRatio);
-            if (dbMemChart.data.labels.length > maxDataPoints) {
-                dbMemChart.data.labels.shift();
-                dbMemChart.data.datasets[0].data.shift();
-            }
-            dbMemChart.update();
+            chartDataBuffer.dbMem.labels.push(now);
+            chartDataBuffer.dbMem.timestamps.push(ts);
+            chartDataBuffer.dbMem.data.push(hitRatio);
+            applyTimeRangeToChart('dbMem');
         }
     }
 
@@ -636,45 +700,35 @@ function updateMetrics(data) {
 
     {
         const now = new Date().toLocaleTimeString();
+        const ts = Date.now();
 
         // CPU Chart - dbHost only
         const cpuVal = hostData.cpuUsage;
         if (cpuVal !== undefined) {
-            dbCpuChart.data.labels.push(now);
-            dbCpuChart.data.datasets[0].data.push(cpuVal);
-            if (dbCpuChart.data.labels.length > maxDataPoints) {
-                dbCpuChart.data.labels.shift();
-                dbCpuChart.data.datasets[0].data.shift();
-            }
-            dbCpuChart.update();
+            chartDataBuffer.dbCpu.labels.push(now);
+            chartDataBuffer.dbCpu.timestamps.push(ts);
+            chartDataBuffer.dbCpu.data.push(cpuVal);
+            applyTimeRangeToChart('dbCpu');
         }
 
         // Disk I/O Chart - dbHost only
         if (hostData.diskReadBytesPerSec !== undefined) {
-            dbDiskChart.data.labels.push(now);
-            dbDiskChart.data.datasets[0].data.push(hostData.diskReadBytesPerSec);
-            dbDiskChart.data.datasets[1].data.push(hostData.diskWriteBytesPerSec || 0);
-            if (dbDiskChart.data.labels.length > maxDataPoints) {
-                dbDiskChart.data.labels.shift();
-                dbDiskChart.data.datasets[0].data.shift();
-                dbDiskChart.data.datasets[1].data.shift();
-            }
-            dbDiskChart.update();
+            chartDataBuffer.dbDisk.labels.push(now);
+            chartDataBuffer.dbDisk.timestamps.push(ts);
+            chartDataBuffer.dbDisk.readData.push(hostData.diskReadBytesPerSec);
+            chartDataBuffer.dbDisk.writeData.push(hostData.diskWriteBytesPerSec || 0);
+            applyTimeRangeToChart('dbDisk');
         } else if (hostData.diskReadBytes !== undefined && hostData.diskWriteBytes !== undefined) {
             const currentTime = Date.now();
             const timeDiff = (currentTime - lastDiskTime) / 1000;
             if (lastDiskReadBytes > 0 && timeDiff > 0) {
                 const readRate = Math.max(0, (hostData.diskReadBytes - lastDiskReadBytes) / timeDiff);
                 const writeRate = Math.max(0, (hostData.diskWriteBytes - lastDiskWriteBytes) / timeDiff);
-                dbDiskChart.data.labels.push(now);
-                dbDiskChart.data.datasets[0].data.push(readRate);
-                dbDiskChart.data.datasets[1].data.push(writeRate);
-                if (dbDiskChart.data.labels.length > maxDataPoints) {
-                    dbDiskChart.data.labels.shift();
-                    dbDiskChart.data.datasets[0].data.shift();
-                    dbDiskChart.data.datasets[1].data.shift();
-                }
-                dbDiskChart.update();
+                chartDataBuffer.dbDisk.labels.push(now);
+                chartDataBuffer.dbDisk.timestamps.push(ts);
+                chartDataBuffer.dbDisk.readData.push(readRate);
+                chartDataBuffer.dbDisk.writeData.push(writeRate);
+                applyTimeRangeToChart('dbDisk');
             }
             lastDiskReadBytes = hostData.diskReadBytes;
             lastDiskWriteBytes = hostData.diskWriteBytes;
@@ -716,30 +770,22 @@ function updateMetrics(data) {
 
         // Network I/O Chart - dbHost only
         if (hostData.networkRecvBytesPerSec !== undefined) {
-            dbNetChart.data.labels.push(now);
-            dbNetChart.data.datasets[0].data.push(hostData.networkRecvBytesPerSec);
-            dbNetChart.data.datasets[1].data.push(hostData.networkSentBytesPerSec || 0);
-            if (dbNetChart.data.labels.length > maxDataPoints) {
-                dbNetChart.data.labels.shift();
-                dbNetChart.data.datasets[0].data.shift();
-                dbNetChart.data.datasets[1].data.shift();
-            }
-            dbNetChart.update();
+            chartDataBuffer.dbNet.labels.push(now);
+            chartDataBuffer.dbNet.timestamps.push(ts);
+            chartDataBuffer.dbNet.recvData.push(hostData.networkRecvBytesPerSec);
+            chartDataBuffer.dbNet.sentData.push(hostData.networkSentBytesPerSec || 0);
+            applyTimeRangeToChart('dbNet');
         } else if (hostData.networkRecvBytes !== undefined && hostData.networkSentBytes !== undefined) {
             const currentTime = Date.now();
             const timeDiff = (currentTime - lastNetTime) / 1000;
             if (lastNetRecvBytes > 0 && timeDiff > 0) {
                 const recvRate = Math.max(0, (hostData.networkRecvBytes - lastNetRecvBytes) / timeDiff);
                 const sentRate = Math.max(0, (hostData.networkSentBytes - lastNetSentBytes) / timeDiff);
-                dbNetChart.data.labels.push(now);
-                dbNetChart.data.datasets[0].data.push(recvRate);
-                dbNetChart.data.datasets[1].data.push(sentRate);
-                if (dbNetChart.data.labels.length > maxDataPoints) {
-                    dbNetChart.data.labels.shift();
-                    dbNetChart.data.datasets[0].data.shift();
-                    dbNetChart.data.datasets[1].data.shift();
-                }
-                dbNetChart.update();
+                chartDataBuffer.dbNet.labels.push(now);
+                chartDataBuffer.dbNet.timestamps.push(ts);
+                chartDataBuffer.dbNet.recvData.push(recvRate);
+                chartDataBuffer.dbNet.sentData.push(sentRate);
+                applyTimeRangeToChart('dbNet');
             }
             lastNetRecvBytes = hostData.networkRecvBytes;
             lastNetSentBytes = hostData.networkSentBytes;
@@ -1230,7 +1276,7 @@ function startBenchmark() {
 }
 
 async function doStartBenchmark() {
-    // Clear TPS chart data for new run (keep CPU/Network for continuous monitoring)
+    // Clear TPS chart data for new run
     tpsChart.data.labels = [];
     tpsChart.data.datasets[0].data = [];
     tpsChart.update();
@@ -1284,6 +1330,165 @@ async function doStopBenchmark() {
     if (result.success) {
         showToast('info', 'Benchmark Stopped', 'Benchmark has been stopped');
     }
+}
+
+// ==================== Time Range ====================
+
+function getChartAndKeys(key) {
+    switch (key) {
+        case 'tps':     return { chart: tpsChart, dataKeys: ['data'] };
+        case 'cpu':     return { chart: cpuChart, dataKeys: ['data'] };
+        case 'network': return { chart: networkChart, dataKeys: ['recvData', 'sentData'] };
+        case 'dbCpu':   return { chart: dbCpuChart, dataKeys: ['data'] };
+        case 'dbMem':   return { chart: dbMemChart, dataKeys: ['data'] };
+        case 'dbDisk':  return { chart: dbDiskChart, dataKeys: ['readData', 'writeData'] };
+        case 'dbNet':   return { chart: dbNetChart, dataKeys: ['recvData', 'sentData'] };
+        case 'dbConn':  return { chart: dbConnChart, dataKeys: ['data'] };
+        default: return null;
+    }
+}
+
+function rangeToSeconds(range) {
+    if (range === 'all') return Infinity;
+    if (range === 'custom') return 'custom';
+    const match = range.match(/^(\d+)(m|h|d)$/);
+    if (!match) return Infinity;
+    const val = parseInt(match[1]);
+    switch (match[2]) {
+        case 'm': return val * 60;
+        case 'h': return val * 3600;
+        case 'd': return val * 86400;
+        default: return Infinity;
+    }
+}
+
+function sliceBuffer(buffer, dataKeys, seconds) {
+    const total = buffer.labels.length;
+    const count = seconds === Infinity ? total : Math.min(seconds, total);
+    const start = total - count;
+    const labels = buffer.labels.slice(start);
+    const datasets = dataKeys.map(k => buffer[k].slice(start));
+    return { labels, datasets };
+}
+
+function sliceBufferByTimeRange(buffer, dataKeys, startTime, endTime) {
+    const labels = [];
+    const datasets = dataKeys.map(() => []);
+    for (let i = 0; i < buffer.labels.length; i++) {
+        const t = buffer.timestamps ? buffer.timestamps[i] : 0;
+        if (t >= startTime && t <= endTime) {
+            labels.push(buffer.labels[i]);
+            dataKeys.forEach((k, di) => datasets[di].push(buffer[k][i]));
+        }
+    }
+    return { labels, datasets };
+}
+
+// Max points to render on chart — keeps curves readable
+const MAX_DISPLAY_POINTS = 100;
+
+/**
+ * Downsample using fixed-interval bucket averaging.
+ * Stable for streaming: adding a new point only affects the last bucket,
+ * so the chart doesn't visually jump on each update.
+ */
+function downsample(labels, datasets, maxPoints) {
+    const len = labels.length;
+    if (len <= maxPoints || maxPoints < 2) {
+        return { labels, datasets };
+    }
+
+    const bucketSize = len / maxPoints;
+    const newLabels = [];
+    const newDatasets = datasets.map(() => []);
+
+    for (let i = 0; i < maxPoints; i++) {
+        const start = Math.floor(i * bucketSize);
+        const end = Math.min(Math.floor((i + 1) * bucketSize), len);
+        const count = end - start;
+
+        // Use the last point's label in each bucket (most recent timestamp)
+        newLabels.push(labels[end - 1]);
+
+        // Average each dataset within the bucket
+        datasets.forEach((ds, di) => {
+            let sum = 0;
+            for (let j = start; j < end; j++) sum += ds[j];
+            newDatasets[di].push(sum / count);
+        });
+    }
+
+    return { labels: newLabels, datasets: newDatasets };
+}
+
+function applyTimeRangeToChart(key) {
+    const info = getChartAndKeys(key);
+    if (!info) return;
+    let result;
+    if (chartTimeRange === 'custom' && customRangeStart && customRangeEnd) {
+        result = sliceBufferByTimeRange(chartDataBuffer[key], info.dataKeys, customRangeStart, customRangeEnd);
+    } else {
+        const seconds = rangeToSeconds(chartTimeRange);
+        result = sliceBuffer(chartDataBuffer[key], info.dataKeys, seconds);
+    }
+    // Downsample if too many points
+    const ds = downsample(result.labels, result.datasets, MAX_DISPLAY_POINTS);
+    info.chart.data.labels = ds.labels;
+    ds.datasets.forEach((d, i) => { info.chart.data.datasets[i].data = d; });
+    info.chart.update();
+}
+
+function applyTimeRange() {
+    for (const key of Object.keys(chartDataBuffer)) {
+        applyTimeRangeToChart(key);
+    }
+}
+
+let customRangeStart = 0;
+let customRangeEnd = 0;
+
+function setTimeRange(btn) {
+    document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chartTimeRange = btn.dataset.range;
+    if (chartTimeRange !== 'custom') {
+        document.getElementById('customRangePicker').style.display = 'none';
+    }
+    applyTimeRange();
+}
+
+function toggleCustomRange(btn) {
+    document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chartTimeRange = 'custom';
+    const picker = document.getElementById('customRangePicker');
+    picker.style.display = 'flex';
+    // Pre-fill with reasonable defaults if empty
+    if (!document.getElementById('customRangeStart').value) {
+        const now = new Date();
+        const ago = new Date(now.getTime() - 600000); // 10 min ago
+        document.getElementById('customRangeStart').value = toLocalISOString(ago);
+        document.getElementById('customRangeEnd').value = toLocalISOString(now);
+    }
+}
+
+function applyCustomRange() {
+    const startVal = document.getElementById('customRangeStart').value;
+    const endVal = document.getElementById('customRangeEnd').value;
+    if (!startVal || !endVal) return;
+    customRangeStart = new Date(startVal).getTime();
+    customRangeEnd = new Date(endVal).getTime();
+    if (customRangeStart >= customRangeEnd) {
+        showToast('warning', 'Invalid Range', 'Start time must be before end time');
+        return;
+    }
+    applyTimeRange();
+}
+
+function toLocalISOString(date) {
+    const pad = n => String(n).padStart(2, '0');
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate())
+        + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
 }
 
 // ==================== SSH Config Toggle ====================

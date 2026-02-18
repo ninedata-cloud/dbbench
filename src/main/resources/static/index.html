@@ -203,6 +203,24 @@
             </div>
         </div>
 
+        <!-- Time Range Selector -->
+        <div class="time-range-bar">
+            <span class="time-range-label">Time Range:</span>
+            <button class="time-range-btn active" data-range="all" onclick="setTimeRange(this)">All</button>
+            <button class="time-range-btn" data-range="1m" onclick="setTimeRange(this)">1m</button>
+            <button class="time-range-btn" data-range="10m" onclick="setTimeRange(this)">10m</button>
+            <button class="time-range-btn" data-range="1h" onclick="setTimeRange(this)">1h</button>
+            <button class="time-range-btn" data-range="6h" onclick="setTimeRange(this)">6h</button>
+            <button class="time-range-btn" data-range="1d" onclick="setTimeRange(this)">1day</button>
+            <button class="time-range-btn" data-range="custom" onclick="toggleCustomRange(this)">Custom</button>
+            <div class="custom-range-picker" id="customRangePicker" style="display:none;">
+                <input type="datetime-local" id="customRangeStart" step="1">
+                <span class="time-range-label">-</span>
+                <input type="datetime-local" id="customRangeEnd" step="1">
+                <button class="btn btn-sm btn-primary" onclick="applyCustomRange()">Apply</button>
+            </div>
+        </div>
+
         <!-- Database Host Metrics Charts - Row 1: CPU, Memory, Disk I/O -->
         <div class="grid grid-3">
             <div class="card">
@@ -548,6 +566,6 @@
         </div>
     </div>
 
-    <script src="js/app.js?v=3"></script>
+    <script src="js/app.js?v=4"></script>
 </body>
 </html>

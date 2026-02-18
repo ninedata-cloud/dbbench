@@ -39,7 +39,7 @@ public class MetricsController {
         return ResponseEntity.ok(response);
     }
     @GetMapping("/history")
-    public ResponseEntity<?> history(@RequestParam(defaultValue = "60") int limit) {
+    public ResponseEntity<?> history(@RequestParam(defaultValue = "3600") int limit) {
         var history = metricsRegistry.getHistory();
         int start = Math.max(0, history.size() - limit);
         return ResponseEntity.ok(history.subList(start, history.size()));
@@ -54,7 +54,7 @@ public class MetricsController {
      * Get TPS history for chart restoration after page refresh
      */
     @GetMapping("/tps-history")
-    public ResponseEntity<?> tpsHistory(@RequestParam(defaultValue = "60") int limit) {
+    public ResponseEntity<?> tpsHistory(@RequestParam(defaultValue = "3600") int limit) {
         List<MetricsSnapshot> history = metricsRegistry.getHistory();
         int start = Math.max(0, history.size() - limit);
 
