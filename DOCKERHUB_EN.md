@@ -126,7 +126,7 @@ To connect directly to the built-in database:
 - Host: `localhost:5432`
 - Database: `tpcc`
 - Username: `postgres`
-- Password: `postgres`
+- Password: `my_postgres_password`
 
 ```bash
 # Expose PostgreSQL port

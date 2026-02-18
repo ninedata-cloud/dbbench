@@ -126,7 +126,7 @@ docker run -d -p 1929:1929 \
 - Host: `localhost:5432`
 - Database: `tpcc`
 - Username: `postgres`
-- Password: `postgres`
+- Password: `my_postgres_password`
 
 ```bash
 # 暴露 PostgreSQL 端口
