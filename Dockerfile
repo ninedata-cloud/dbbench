@@ -50,7 +50,7 @@ RUN /usr/lib/postgresql/17/bin/initdb -D /var/lib/postgresql/17/main --encoding=
 
 # Create database and user
 RUN /usr/lib/postgresql/17/bin/pg_ctl -D /var/lib/postgresql/17/main start -w \
-    && psql --command "ALTER USER postgres WITH PASSWORD 'postgres';" \
+    && psql --command "ALTER USER postgres WITH PASSWORD 'my_postgres_password';" \
     && psql --command "CREATE DATABASE tpcc OWNER postgres;" \
     && /usr/lib/postgresql/17/bin/pg_ctl -D /var/lib/postgresql/17/main stop -w
 
@@ -90,7 +90,7 @@ ENV JAVA_OPTS="-Xms512m -Xmx1024m"
 ENV DB_TYPE=postgresql
 ENV DB_JDBC_URL=jdbc:postgresql://localhost:5432/tpcc
 ENV DB_USERNAME=postgres
-ENV DB_PASSWORD=postgres
+ENV DB_PASSWORD=my_postgres_password
 ENV DB_POOL_SIZE=50
 ENV BENCHMARK_WAREHOUSES=10
 ENV BENCHMARK_TERMINALS=50

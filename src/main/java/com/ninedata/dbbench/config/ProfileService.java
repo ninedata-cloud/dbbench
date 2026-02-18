@@ -56,8 +56,16 @@ public class ProfileService {
         }
         Path file = PROFILES_DIR.resolve(safeName + ".properties");
         Properties props = configToProperties(config);
-        try (Writer writer = Files.newBufferedWriter(file)) {
-            props.store(writer, "Profile: " + name);
+        try (BufferedWriter writer = Files.newBufferedWriter(file)) {
+            writer.write("# Profile: " + name);
+            writer.newLine();
+            // Write properties manually to avoid Java's default escaping of : and =
+            List<String> keys = new ArrayList<>(props.stringPropertyNames());
+            Collections.sort(keys);
+            for (String key : keys) {
+                writer.write(key + "=" + props.getProperty(key));
+                writer.newLine();
+            }
         }
         log.info("Profile saved: {}", name);
     }

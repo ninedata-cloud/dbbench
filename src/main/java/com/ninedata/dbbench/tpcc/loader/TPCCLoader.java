@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -436,7 +437,7 @@ public class TPCCLoader {
         }
     }
 
-    // ==================== CSV Fast Load ====================
+    // ==================== CSV Pipeline Load ====================
 
     private void loadViaCsv() throws SQLException {
         Path tmpDir;
@@ -449,83 +450,100 @@ public class TPCCLoader {
         try {
             CsvDataWriter csvWriter = new CsvDataWriter(tmpDir);
 
-            // Phase 1: Generate CSV files concurrently
-            reportProgress("Generating CSV files...");
-            generateCsvFiles(csvWriter);
+            // 1. Item: generate → import → delete
+            generateAndImportItems(csvWriter);
             checkCancelled();
 
-            // Phase 2: Import CSV files into database table by table
-            reportProgress("Importing CSV files into database...");
-            importCsvFiles(csvWriter);
+            // 2. Warehouse pipeline: generate → import → delete, per warehouse
+            pipelineLoadWarehouses(csvWriter);
 
         } finally {
-            // Cleanup temp files
-            try {
-                try (var stream = Files.walk(tmpDir)) {
-                    stream.sorted(java.util.Comparator.reverseOrder())
-                            .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
-                }
-            } catch (IOException e) {
-                log.warn("Failed to clean up temp CSV directory: {}", tmpDir);
-            }
+            cleanupTempDir(tmpDir);
         }
     }
 
-    private void generateCsvFiles(CsvDataWriter csvWriter) throws SQLException {
-        // Generate items CSV (single file)
+    private void generateAndImportItems(CsvDataWriter csvWriter) throws SQLException {
+        reportProgress(2, "Generating item CSV...");
         try {
-            reportProgress("Generating item CSV...");
             csvWriter.writeItems();
-            reportProgress("Item CSV generated: " + TPCCUtil.ITEMS + " rows");
         } catch (IOException e) {
             throw new SQLException("Failed to generate item CSV", e);
         }
-        checkCancelled();
 
-        // Generate per-warehouse CSVs concurrently
+        reportProgress(5, "Importing item table (" + TPCCUtil.ITEMS + " rows)...");
+        adapter.loadCsvFile("item", csvWriter.getFilePath("item"), CsvDataWriter.ITEM_COLUMNS);
+        deleteFileQuietly(csvWriter.getFilePath("item"));
+        reportProgress(10, "Item table loaded");
+    }
+
+    private void pipelineLoadWarehouses(CsvDataWriter csvWriter) throws SQLException {
+        AtomicReference<Throwable> firstError = new AtomicReference<>();
+        completedWarehouses.set(0);
+
+        // Each thread generates CSV and imports for its own warehouse
         executor = Executors.newFixedThreadPool(concurrency);
         List<Future<Void>> futures = new ArrayList<>();
-        completedWarehouses.set(0);
 
         for (int w = 1; w <= warehouses; w++) {
             final int wId = w;
             futures.add(executor.submit(() -> {
-                if (cancelled) return null;
+                if (cancelled || firstError.get() != null) return null;
                 try {
+                    // Generate CSV files for this warehouse
                     csvWriter.writeWarehouse(wId);
                     csvWriter.writeDistricts(wId);
                     csvWriter.writeCustomers(wId);
                     csvWriter.writeStock(wId);
                     csvWriter.writeOrders(wId);
-                    int done = completedWarehouses.incrementAndGet();
-                    reportProgress(String.format("CSV generated for warehouse %d (%d/%d)", wId, done, warehouses));
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to generate CSV for warehouse " + wId, e);
+
+                    // Import immediately after generation
+                    if (!cancelled && firstError.get() == null) {
+                        importAndDeleteWarehouse(csvWriter, wId);
+                    }
+
+                    if (!cancelled) {
+                        int done = completedWarehouses.incrementAndGet();
+                        reportProgress(10 + (int) ((done * 85.0) / warehouses),
+                                String.format("Warehouse %d/%d done (w_id=%d)", done, warehouses, wId));
+                    }
+                } catch (Exception e) {
+                    firstError.compareAndSet(null, e);
                 }
                 return null;
             }));
         }
-
         executor.shutdown();
-        try {
-            for (Future<Void> f : futures) {
-                if (cancelled) break;
-                f.get();
-            }
-        } catch (InterruptedException | ExecutionException e) {
-            if (!cancelled) throw new SQLException("CSV generation failed", e);
-        }
-        checkCancelled();
-        reportProgress("All CSV files generated");
-    }
-    private void importCsvFiles(CsvDataWriter csvWriter) throws SQLException {
-        // Import items
-        reportProgress("Importing items...");
-        adapter.loadCsvFile("item", csvWriter.getFilePath("item"), CsvDataWriter.ITEM_COLUMNS);
-        checkCancelled();
 
-        // Table import order and their column definitions
-        String[][] tableInfo = {
+        // Wait for all warehouses to complete
+        try {
+            for (Future<Void> future : futures) {
+                if (cancelled) break;
+                future.get();
+            }
+            if (!cancelled) {
+                executor.awaitTermination(1, TimeUnit.HOURS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SQLException("Pipeline loading interrupted", e);
+        } catch (ExecutionException e) {
+            throw new SQLException("Pipeline loading failed", e.getCause());
+        }
+
+        // Check for errors
+        Throwable err = firstError.get();
+        if (err != null) {
+            throw new SQLException("CSV load failed: " + err.getMessage(), err);
+        }
+        if (cancelled) {
+            throw new SQLException("Data loading cancelled by user");
+        }
+
+        reportProgress(95, "All warehouses loaded, finalizing...");
+    }
+
+    private void importAndDeleteWarehouse(CsvDataWriter csvWriter, int wId) throws SQLException {
+        String[][] tables = {
                 {"warehouse", null},
                 {"district", null},
                 {"customer", null},
@@ -535,7 +553,7 @@ public class TPCCLoader {
                 {"new_order", null},
                 {"order_line", null}
         };
-        String[][] columnArrays = {
+        String[][] columns = {
                 CsvDataWriter.WAREHOUSE_COLUMNS,
                 CsvDataWriter.DISTRICT_COLUMNS,
                 CsvDataWriter.CUSTOMER_COLUMNS,
@@ -546,16 +564,31 @@ public class TPCCLoader {
                 CsvDataWriter.ORDER_LINE_COLUMNS
         };
 
-        for (int t = 0; t < tableInfo.length; t++) {
-            String tableName = tableInfo[t][0];
-            String[] columns = columnArrays[t];
-            reportProgress("Importing " + tableName + "...");
+        for (int t = 0; t < tables.length; t++) {
+            checkCancelled();
+            String tableName = tables[t][0];
+            String filePath = csvWriter.getFilePath(tableName, wId);
+            adapter.loadCsvFile(tableName, filePath, columns[t]);
+            deleteFileQuietly(filePath);
+        }
+    }
 
-            for (int w = 1; w <= warehouses; w++) {
-                checkCancelled();
-                adapter.loadCsvFile(tableName, csvWriter.getFilePath(tableName, w), columns);
+    private void deleteFileQuietly(String path) {
+        try {
+            Files.deleteIfExists(Path.of(path));
+        } catch (IOException e) {
+            log.warn("Failed to delete temp CSV file: {}", path);
+        }
+    }
+
+    private void cleanupTempDir(Path tmpDir) {
+        try {
+            try (var stream = Files.walk(tmpDir)) {
+                stream.sorted(java.util.Comparator.reverseOrder())
+                        .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
             }
-            reportProgress(tableName + " imported for all warehouses");
+        } catch (IOException e) {
+            log.warn("Failed to clean up temp CSV directory: {}", tmpDir);
         }
     }
 }

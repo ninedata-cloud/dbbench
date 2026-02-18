@@ -9,7 +9,8 @@ public class TransactionMetrics {
     private final String name;
     private final LongAdder count = new LongAdder();
     private final LongAdder successCount = new LongAdder();
-    private final LongAdder failureCount = new LongAdder();
+    private final LongAdder rollbackCount = new LongAdder();
+    private final LongAdder errorCount = new LongAdder();
     private final LongAdder totalLatencyNanos = new LongAdder();
     private final AtomicLong minLatencyNanos = new AtomicLong(Long.MAX_VALUE);
     private final AtomicLong maxLatencyNanos = new AtomicLong(0);
@@ -25,11 +26,23 @@ public class TransactionMetrics {
         updateMinMax(latencyNanos);
     }
 
-    public void recordFailure(long latencyNanos) {
+    public void recordRollback(long latencyNanos) {
         count.increment();
-        failureCount.increment();
+        rollbackCount.increment();
         totalLatencyNanos.add(latencyNanos);
         updateMinMax(latencyNanos);
+    }
+
+    public void recordError(long latencyNanos) {
+        count.increment();
+        errorCount.increment();
+        totalLatencyNanos.add(latencyNanos);
+        updateMinMax(latencyNanos);
+    }
+
+    /** @deprecated use {@link #recordRollback(long)} or {@link #recordError(long)} */
+    public void recordFailure(long latencyNanos) {
+        recordRollback(latencyNanos);
     }
 
     private void updateMinMax(long latencyNanos) {
@@ -48,7 +61,9 @@ public class TransactionMetrics {
 
     public long getCount() { return count.sum(); }
     public long getSuccessCount() { return successCount.sum(); }
-    public long getFailureCount() { return failureCount.sum(); }
+    public long getRollbackCount() { return rollbackCount.sum(); }
+    public long getErrorCount() { return errorCount.sum(); }
+    public long getFailureCount() { return rollbackCount.sum() + errorCount.sum(); }
 
     public double getAverageLatencyMs() {
         long c = count.sum();

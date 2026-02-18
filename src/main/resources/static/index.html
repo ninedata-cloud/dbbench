@@ -6,6 +6,7 @@
     <title>DBBench - TPC-C Benchmark Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
     <script src="js/chart.min.js"></script>
+    <script src="js/marked.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -36,6 +37,16 @@
             <button class="btn btn-danger" onclick="cleanData()" id="btnClean">Clean Data</button>
             <button class="btn btn-primary" onclick="startBenchmark()" id="btnStart">Start Benchmark</button>
             <button class="btn btn-danger" onclick="stopBenchmark()" id="btnStop" disabled>Stop</button>
+            <button class="btn btn-secondary" onclick="openReportModal()" id="btnReport" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Report
+            </button>
             <span class="status status-idle" id="status">IDLE</span>
         </div>
 
@@ -95,6 +106,18 @@
                 <div class="metric">
                     <span class="metric-label">Throughput (TPS)</span>
                     <span class="metric-value highlight" id="tps">0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Throughput (TPM)</span>
+                    <span class="metric-value highlight" id="tpm">0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">New Order TPM (tpmC)</span>
+                    <span class="metric-value highlight" id="newOrderTpm">0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">New Order Avg Latency</span>
+                    <span class="metric-value" id="newOrderLatency">0 ms</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Total Transactions</span>
@@ -253,15 +276,20 @@
                         <th>Transaction Type</th>
                         <th>Count</th>
                         <th>Success</th>
-                        <th>Failed</th>
+                        <th>Rollback</th>
+                        <th>Error</th>
                         <th>Success Rate</th>
                         <th>Avg Latency</th>
                     </tr>
                 </thead>
                 <tbody id="txTable">
-                    <tr><td colspan="6" style="text-align: center; color: #888;">No data yet</td></tr>
+                    <tr><td colspan="7" style="text-align: center; color: #888;">No data yet</td></tr>
                 </tbody>
             </table>
+            <div style="margin-top: 8px; font-size: 12px; color: #888; line-height: 1.5;">
+                <span style="color: #ffa500;">Rollback</span> = expected TPC-C business rollbacks (e.g. invalid item, customer not found).
+                <span style="color: #ff4757;">Error</span> = unexpected failures (connection issues, SQL exceptions).
+            </div>
         </div>
 
         <!-- Activity Log -->
@@ -499,6 +527,26 @@
 
     <!-- Toast Notifications -->
     <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Report Modal -->
+    <div class="modal-overlay" id="reportModal">
+        <div class="modal modal-report">
+            <div class="modal-header">
+                <h2>Benchmark Report</h2>
+                <button class="modal-close" onclick="closeModal('reportModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="report-content" id="reportContent">
+                    <div class="text-muted text-center" style="padding: 40px;">Loading report...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="downloadReportMd()">Download .md</button>
+                <button class="btn btn-primary" onclick="printReport()">Export PDF</button>
+                <button class="btn btn-secondary" onclick="closeModal('reportModal')">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script src="js/app.js?v=3"></script>
 </body>

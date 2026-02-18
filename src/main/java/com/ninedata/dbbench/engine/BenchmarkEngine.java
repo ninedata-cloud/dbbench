@@ -336,27 +336,10 @@ public class BenchmarkEngine {
 
                 TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.getLoadMode());
                 currentLoader = loader;
-                loader.setProgressCallback(msg -> {
+                loader.setProgressCallback(msg -> addLog("INFO", msg));
+                loader.setStructuredProgressCallback((pct, msg) -> {
                     addLog("INFO", msg);
-                    // Parse progress from message
-                    if (msg.contains("Items loaded")) {
-                        broadcastLoadProgress(15, msg);
-                    } else if (msg.contains("Warehouse") && msg.contains("completed")) {
-                        // Extract progress from "Warehouse X completed (Y/Z)"
-                        try {
-                            int start = msg.indexOf("(") + 1;
-                            int mid = msg.indexOf("/");
-                            int end = msg.indexOf(")");
-                            int completed = Integer.parseInt(msg.substring(start, mid));
-                            int total = Integer.parseInt(msg.substring(mid + 1, end));
-                            int progress = 15 + (int) ((completed * 80.0) / total);
-                            broadcastLoadProgress(progress, msg);
-                        } catch (Exception e) {
-                            broadcastLoadProgress(loadProgress, msg);
-                        }
-                    } else {
-                        broadcastLoadProgress(loadProgress, msg);
-                    }
+                    broadcastLoadProgress(pct, msg);
                 });
                 loader.load();
                 currentLoader = null;
@@ -546,10 +529,10 @@ public class BenchmarkEngine {
             };
 
             long startTime = System.nanoTime();
-            boolean success = tx.execute();
+            TransactionResult result = tx.execute();
             long latency = System.nanoTime() - startTime;
 
-            metricsRegistry.recordTransaction(tx.getName(), success, latency);
+            metricsRegistry.recordTransaction(tx.getName(), result, latency);
 
             // Think time
             if (benchConfig.isThinkTime()) {
@@ -579,7 +562,7 @@ public class BenchmarkEngine {
                 hostMetrics = adapter.collectHostMetrics();
             }
 
-            metricsRegistry.takeSnapshot(dbMetrics, clientMetrics);
+            metricsRegistry.takeSnapshot(dbMetrics, clientMetrics, hostMetrics);
 
             if (metricsCallback != null) {
                 Map<String, Object> allMetrics = new LinkedHashMap<>();

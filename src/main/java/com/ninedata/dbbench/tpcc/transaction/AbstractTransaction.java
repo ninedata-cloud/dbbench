@@ -33,22 +33,23 @@ public abstract class AbstractTransaction {
 
     public abstract String getName();
 
-    public boolean execute() {
+    public TransactionResult execute() {
         try (Connection conn = adapter.getConnection()) {
             boolean success = doExecute(conn);
             if (success) {
                 conn.commit();
+                return TransactionResult.SUCCESS;
             } else {
                 conn.rollback();
+                return TransactionResult.ROLLBACK;
             }
-            return success;
         } catch (SQLException e) {
             String errorMsg = String.format("[%s] %s", getName(), e.getMessage());
             log.error(errorMsg);
             if (errorCallback != null) {
                 errorCallback.accept("ERROR", errorMsg);
             }
-            return false;
+            return TransactionResult.ERROR;
         }
     }
 

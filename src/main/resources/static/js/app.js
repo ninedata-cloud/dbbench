@@ -15,6 +15,8 @@ let dbNetChart = null;
 let dbConnChart = null;
 const maxDataPoints = 60;
 let currentConfig = null;
+let savedDbPassword = '';
+let savedSshPassword = '';
 let allLogs = [];
 let statusPollInterval = null;
 let lastStatus = null;
@@ -523,7 +525,10 @@ function handleWebSocketMessage(data) {
 function updateMetrics(data) {
     if (data.transaction) {
         const tx = data.transaction;
-        document.getElementById('tps').textContent = tx.tps?.toFixed(2) || '0.00';
+        document.getElementById('tps').textContent = Math.round(tx.tps || 0);
+        document.getElementById('tpm').textContent = Math.round(tx.tpm || 0);
+        document.getElementById('newOrderTpm').textContent = Math.round(tx.newOrderTpm || 0);
+        document.getElementById('newOrderLatency').textContent = (tx.newOrderAvgLatencyMs?.toFixed(2) || '0.00') + ' ms';
         document.getElementById('totalTx').textContent = tx.totalTransactions || 0;
         document.getElementById('successRate').textContent = (tx.overallSuccessRate || 0).toFixed(1) + '%';
         document.getElementById('avgLatency').textContent = (tx.avgLatencyMs?.toFixed(2) || '0.00') + ' ms';
@@ -552,7 +557,8 @@ function updateMetrics(data) {
                     <td>${t.name}</td>
                     <td>${t.count}</td>
                     <td style="color: #00ff88">${t.success}</td>
-                    <td style="color: #ff4757">${t.failure}</td>
+                    <td style="color: #ffa500">${t.rollback || 0}</td>
+                    <td style="color: #ff4757">${t.error || 0}</td>
                     <td>${t.successRate?.toFixed(1) || 0}%</td>
                     <td>${t.avgLatencyMs?.toFixed(2) || 0} ms</td>
                 </tr>
@@ -791,6 +797,7 @@ function updateStatus(status) {
     document.getElementById('btnLoad').disabled = isRunning || isLoading;
     document.getElementById('btnClean').disabled = isRunning || isLoading;
     document.getElementById('btnConfig').disabled = !canConfig;
+    document.getElementById('btnReport').disabled = (status !== 'STOPPED');
 
     // Show/hide progress container
     const progressContainer = document.getElementById('loadProgressContainer');
@@ -864,7 +871,7 @@ function openConfigModal() {
     document.getElementById('cfgFormDbType').value = cfg.database?.type || 'mysql';
     document.getElementById('cfgFormJdbcUrl').value = cfg.database?.jdbcUrl || '';
     document.getElementById('cfgFormDbUser').value = cfg.database?.username || '';
-    document.getElementById('cfgFormDbPass').value = '';  // Don't show password
+    document.getElementById('cfgFormDbPass').value = savedDbPassword;
     document.getElementById('cfgFormPoolSize').value = cfg.database?.poolSize || 50;
 
     // Benchmark config
@@ -887,7 +894,7 @@ function openConfigModal() {
     document.getElementById('cfgFormSshHost').value = cfg.ssh?.host || '';
     document.getElementById('cfgFormSshPort').value = cfg.ssh?.port || 22;
     document.getElementById('cfgFormSshUser').value = cfg.ssh?.username || 'root';
-    document.getElementById('cfgFormSshPass').value = '';
+    document.getElementById('cfgFormSshPass').value = savedSshPassword;
     document.getElementById('cfgFormSshKey').value = '';
     toggleSshFields();
 
@@ -928,9 +935,10 @@ async function saveConfig() {
         }
     };
 
-    // Add password only if provided
+    // Cache passwords
     const password = document.getElementById('cfgFormDbPass').value;
     if (password) {
+        savedDbPassword = password;
         newConfig.database.password = password;
     }
 
@@ -944,6 +952,7 @@ async function saveConfig() {
     };
     const sshPass = document.getElementById('cfgFormSshPass').value;
     if (sshPass) {
+        savedSshPassword = sshPass;
         newConfig.ssh.password = sshPass;
     }
     const sshKey = document.getElementById('cfgFormSshKey').value;
@@ -1461,7 +1470,7 @@ function formatBytes(bytes) {
 function formatBytesShort(bytes) {
     if (bytes === 0) return '0';
     const k = 1024;
-    const sizes = ['B', 'K', 'M', 'G', 'T'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
 }
@@ -1674,7 +1683,9 @@ function fillConfigForm(cfg) {
         document.getElementById('cfgFormDbType').value = cfg.database.type || 'mysql';
         document.getElementById('cfgFormJdbcUrl').value = cfg.database.jdbcUrl || '';
         document.getElementById('cfgFormDbUser').value = cfg.database.username || '';
-        document.getElementById('cfgFormDbPass').value = cfg.database.password || '';
+        const dbPass = cfg.database.password || '';
+        document.getElementById('cfgFormDbPass').value = dbPass;
+        if (dbPass) savedDbPassword = dbPass;
         document.getElementById('cfgFormPoolSize').value = cfg.database.poolSize || 50;
     }
     if (cfg.benchmark) {
@@ -1697,7 +1708,9 @@ function fillConfigForm(cfg) {
         document.getElementById('cfgFormSshHost').value = cfg.ssh.host || '';
         document.getElementById('cfgFormSshPort').value = cfg.ssh.port || 22;
         document.getElementById('cfgFormSshUser').value = cfg.ssh.username || 'root';
-        document.getElementById('cfgFormSshPass').value = cfg.ssh.password || '';
+        const sshPass = cfg.ssh.password || '';
+        document.getElementById('cfgFormSshPass').value = sshPass;
+        if (sshPass) savedSshPassword = sshPass;
         document.getElementById('cfgFormSshKey').value = cfg.ssh.privateKey || '';
         toggleSshFields();
     }
@@ -1763,7 +1776,7 @@ function buildConfigFromForm() {
             type: dbType,
             jdbcUrl: document.getElementById('cfgFormJdbcUrl').value,
             username: document.getElementById('cfgFormDbUser').value,
-            password: document.getElementById('cfgFormDbPass').value,
+            password: document.getElementById('cfgFormDbPass').value || savedDbPassword,
             poolSize: parseInt(document.getElementById('cfgFormPoolSize').value)
         },
         ssh: {
@@ -1771,7 +1784,7 @@ function buildConfigFromForm() {
             host: document.getElementById('cfgFormSshHost').value,
             port: parseInt(document.getElementById('cfgFormSshPort').value) || 22,
             username: document.getElementById('cfgFormSshUser').value,
-            password: document.getElementById('cfgFormSshPass').value,
+            password: document.getElementById('cfgFormSshPass').value || savedSshPassword,
             privateKey: document.getElementById('cfgFormSshKey').value
         },
         benchmark: {
@@ -1790,4 +1803,51 @@ function buildConfigFromForm() {
             stockLevel: parseInt(document.getElementById('cfgFormMixStockLevel').value)
         }
     };
+}
+
+// ==================== Report ====================
+
+let cachedReportMarkdown = '';
+
+async function openReportModal() {
+    openModal('reportModal');
+    const contentEl = document.getElementById('reportContent');
+    contentEl.innerHTML = '<div class="text-muted text-center" style="padding: 40px;">Loading report...</div>';
+
+    try {
+        const res = await fetch('/api/report/markdown');
+        if (!res.ok) throw new Error('Failed to fetch report');
+        cachedReportMarkdown = await res.text();
+        contentEl.innerHTML = marked.parse(cachedReportMarkdown);
+    } catch (e) {
+        contentEl.innerHTML = '<div class="text-center" style="color: #ff4757; padding: 40px;">Failed to load report: ' + escapeHtml(e.message) + '</div>';
+    }
+}
+
+function downloadReportMd() {
+    window.open('/api/report/download/markdown', '_blank');
+}
+
+function printReport() {
+    const content = document.getElementById('reportContent').innerHTML;
+    const win = window.open('', '_blank');
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">');
+    win.document.write('<title>DBBench Report</title>');
+    win.document.write('<style>');
+    win.document.write('body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;');
+    win.document.write('max-width:900px;margin:0 auto;padding:40px;color:#222;background:#fff;}');
+    win.document.write('h1{color:#1a1a2e;border-bottom:2px solid #00b8d9;padding-bottom:10px;}');
+    win.document.write('h2{color:#16213e;margin-top:30px;border-bottom:1px solid #ddd;padding-bottom:8px;}');
+    win.document.write('h3{color:#333;margin-top:20px;}');
+    win.document.write('table{width:100%;border-collapse:collapse;margin:15px 0;}');
+    win.document.write('th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;}');
+    win.document.write('th{background:#f5f5f5;font-weight:600;}');
+    win.document.write('tr:nth-child(even){background:#fafafa;}');
+    win.document.write('strong{color:#1a1a2e;}');
+    win.document.write('@media print{body{padding:20px;}}');
+    win.document.write('</style></head><body>');
+    win.document.write(content);
+    win.document.write('</body></html>');
+    win.document.close();
+    setTimeout(() => win.print(), 300);
 }

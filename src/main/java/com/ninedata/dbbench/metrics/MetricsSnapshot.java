@@ -9,4 +9,5 @@ public class MetricsSnapshot {
     private Map<String, Object> transactionMetrics;
     private Map<String, Object> databaseMetrics;
     private Map<String, Object> clientMetrics;
+    private Map<String, Object> dbHostMetrics;
 }

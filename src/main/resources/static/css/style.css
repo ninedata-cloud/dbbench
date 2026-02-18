@@ -1060,3 +1060,96 @@ body {
     color: #bbb;
     word-break: break-word;
 }
+
+/* Report Modal */
+.modal.modal-report {
+    max-width: 900px;
+}
+
+.report-content {
+    background: #0d0d1a;
+    border-radius: 8px;
+    padding: 30px;
+    max-height: 65vh;
+    overflow-y: auto;
+    line-height: 1.7;
+}
+
+.report-content h1 {
+    color: #00d9ff;
+    font-size: 22px;
+    border-bottom: 2px solid #00d9ff;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.report-content h2 {
+    color: #00d9ff;
+    font-size: 18px;
+    margin-top: 25px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+.report-content h3 {
+    color: #aaa;
+    font-size: 15px;
+    margin-top: 18px;
+    margin-bottom: 10px;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.report-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+}
+
+.report-content th,
+.report-content td {
+    border: 1px solid #333;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 13px;
+}
+
+.report-content th {
+    background: #16213e;
+    color: #00d9ff;
+    font-weight: 600;
+}
+
+.report-content tr:hover {
+    background: rgba(0, 217, 255, 0.05);
+}
+
+.report-content strong {
+    color: #fff;
+}
+
+.report-content ul {
+    padding-left: 20px;
+    margin: 10px 0;
+}
+
+.report-content li {
+    margin-bottom: 4px;
+    color: #ccc;
+}
+
+.report-content hr {
+    border: none;
+    border-top: 1px solid #333;
+    margin: 20px 0;
+}
+
+.report-content em {
+    color: #888;
+}
+
+.report-content p {
+    margin: 8px 0;
+    color: #ccc;
+}
