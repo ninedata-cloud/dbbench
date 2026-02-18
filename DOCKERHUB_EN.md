@@ -8,7 +8,7 @@ DBBench is a professional database performance testing tool that fully implement
 
 - **Ready to Use**: Built-in PostgreSQL 17, no external database configuration required
 - **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, GBase8s, Sybase, SAP HANA
-- **Real-Time Monitoring**: Web UI with live TPS, latency, CPU, memory, network metrics
+- **Real-Time Monitoring**: Web UI with live TPS, latency, CPU, memory, network metrics and time range selector (All / 1m / 10m / 1h / 6h / 1day / Custom)
 - **Full TPC-C**: All 5 transaction types (New-Order, Payment, Order-Status, Delivery, Stock-Level)
 - **CSV Fast Load**: Database-native bulk import (MySQL LOAD DATA, PostgreSQL COPY, etc.) for faster data loading
 - **Flexible Configuration**: Environment variable support for various testing scenarios
@@ -97,7 +97,8 @@ docker run -d -p 1929:1929 \
 3. **Configure Connection**: Set database connection in the config panel (skip if using built-in PostgreSQL)
 4. **Load Data**: Click "Load Data" to generate test data
 5. **Run Benchmark**: Click "Start" to begin the benchmark
-6. **View Results**: Monitor TPS, latency, and system resources in real-time
+6. **View Results**: Monitor TPS, latency, and system resources in real-time, use time range selector to view different periods
+7. **Export Report**: Click "Report" after test completes to view/export the benchmark report
 
 ## Data Scale Reference
 
@@ -143,15 +144,24 @@ docker run -d -p 1929:1929 -p 5432:5432 --name dbbench yzsind/dbbench:latest
 | `/api/benchmark/stop` | POST | Stop benchmark |
 | `/api/benchmark/status` | GET | Get current status |
 | `/api/metrics/current` | GET | Get real-time metrics |
+| `/api/metrics/history` | GET | Get metrics history (up to 3600 snapshots) |
+| `/api/metrics/tps-history` | GET | Get TPS history data |
+| `/api/report/markdown` | GET | Get benchmark report (Markdown) |
 
 ## Metrics Collected
 
 ### Transaction Metrics
-- Throughput (TPS)
+- Throughput (TPS / TPM / tpmC)
 - Total transactions count
-- Success/Failure counts and rates
+- Success / Rollback / Error counts and rates
 - Latency (average, min, max)
 - Per-transaction type breakdown
+
+### Database Host Metrics (via SSH)
+- CPU usage (%)
+- Memory usage (%)
+- Disk I/O (read/write bytes/sec)
+- Network I/O (recv/sent bytes/sec)
 
 ### Database Metrics
 - Active connections

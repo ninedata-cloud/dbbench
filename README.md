@@ -18,10 +18,10 @@
 
 - **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, GBase8s, Sybase, SAP HANA
 - **Full TPC-C Implementation**: All 5 transaction types with configurable mix
-- **Real-Time Dashboard**: Web UI with live charts and metrics
+- **Real-Time Dashboard**: Web UI with live charts, time range selector, and metrics
 - **CSV Fast Load**: Database-native bulk import for faster data loading (MySQL LOAD DATA, PostgreSQL COPY, etc.)
 - **Dual Mode**: CLI for automation, Web UI for interactive use
-- **Comprehensive Metrics**: Transaction, Database, OS, and Database Host metrics collection
+- **Comprehensive Metrics**: Transaction, Database, OS, and Database Host metrics collection with up to 1 hour history retention
 - **Easy Configuration**: JDBC URL based connection, auto database type detection
 
 ## Supported Databases
@@ -253,7 +253,11 @@ All configuration can be overridden via environment variables:
 | `/api/benchmark/status` | GET | Get current status |
 | `/api/benchmark/logs` | GET | Get activity logs |
 | `/api/metrics/current` | GET | Get current metrics |
-| `/api/metrics/tps-history` | GET | Get TPS history |
+| `/api/metrics/history` | GET | Get metrics history (default: up to 3600 snapshots) |
+| `/api/metrics/tps-history` | GET | Get TPS history (default: up to 3600 snapshots) |
+| `/api/metrics/hardware-info` | GET | Get client and DB server hardware info |
+| `/api/report/markdown` | GET | Get benchmark report in Markdown |
+| `/api/report/download/markdown` | GET | Download benchmark report as .md file |
 
 ## WebSocket
 
@@ -290,6 +294,12 @@ Message types:
 - Row lock waits
 - Slow queries count
 
+### Database Host Metrics (via SSH)
+- CPU usage (%)
+- Memory usage (%)
+- Disk I/O (read/write bytes/sec)
+- Network I/O (recv/sent bytes/sec)
+
 ### Client Metrics (Local Machine)
 - CPU usage (%)
 - Memory usage (%)
@@ -322,13 +332,15 @@ Per warehouse (approximately):
 ### Web Dashboard
 The web dashboard provides real-time monitoring with:
 - Configuration panel with connection testing
-- Performance summary (TPS, latency, success rate)
-- System resources (CPU, Memory)
-- Database metrics
+- Performance summary (TPS, TPM, tpmC, latency, success rate)
+- Time range selector (All / 1m / 10m / 1h / 6h / 1day / Custom) for chart zoom
+- Smart downsampling for smooth chart rendering at any time scale
+- Database host metrics (CPU, Memory, Disk I/O, Network I/O, Connections)
+- Client metrics (CPU, Memory, Network I/O)
 - TPS chart over time
-- CPU and Network I/O charts
-- Transaction breakdown table
+- Transaction breakdown table with Rollback/Error split
 - Activity logs
+- Benchmark report generation (Markdown / PDF)
 
 ## Development
 
