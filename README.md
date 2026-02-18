@@ -144,63 +144,62 @@ From the web dashboard you can:
 
 ### CLI Mode
 
+CLI mode reads all configuration from a profile file (`-f`), the same format used by the Web UI.
+
 ```bash
-# Load data only
-java -jar target/dbbench-1.0.0.jar \
-  --jdbcurl "jdbc:mysql://127.0.0.1:3306/tpcc?useSSL=false&rewriteBatchedStatements=true" \
-  -u root -p password \
-  -w 10 \
-  --load-only
+# Load test data
+java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties load
 
 # Run benchmark (data must be loaded first)
-java -jar target/dbbench-1.0.0.jar \
-  --jdbcurl "jdbc:mysql://127.0.0.1:3306/tpcc" \
-  -u root -p password \
-  -c 50 -d 300
+java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties run
 
-# Clean existing data and reload
-java -jar target/dbbench-1.0.0.jar \
-  --jdbcurl "jdbc:mysql://127.0.0.1:3306/tpcc" \
-  -u root -p password \
-  -w 5 \
-  --clean
+# Clean existing data
+java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties clean
+
+# Combine actions: clean → load → run
+java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties clean load run
+
+# Override specific settings from config file
+java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
 ```
 
 ## CLI Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--jdbcurl` | JDBC connection URL (required) | - |
-| `-u, --user` | Database username | root |
-| `-p, --password` | Database password | (empty) |
-| `-w, --warehouses` | Number of warehouses | 1 |
-| `-c, --terminals` | Concurrent threads | 10 |
-| `-d, --duration` | Test duration in seconds | 60 |
-| `--pool-size` | Connection pool size | 50 |
-| `--load-threads` | Parallel threads for data loading | 4 |
-| `--csv-load` | Use database-native CSV bulk loading | false |
-| `--load-only` | Only load data, skip benchmark | false |
-| `--clean` | Clean existing data and reload | false |
-| `-h, --help` | Show help message | - |
-| `-V, --version` | Show version | - |
+| Option | Description |
+|--------|-------------|
+| `-f, --config` | Configuration file path (required) |
+| `-w, --warehouses` | Override warehouses count |
+| `-c, --terminals` | Override terminal count |
+| `-d, --duration` | Override test duration (seconds) |
+| `-h, --help` | Show help message |
+| `-V, --version` | Show version |
+
+Actions (positional, can combine multiple):
+| Action | Description |
+|--------|-------------|
+| `clean` | Clean existing test data |
+| `load` | Load TPC-C test data |
+| `run` | Run benchmark |
 
 ## Configuration File
 
-Edit `src/main/resources/application.properties` for default settings:
+Configuration files use `.properties` format and are stored in the `profiles/` directory. The same format is shared between CLI mode and Web UI profiles.
 
 ```properties
-# Server (default port: 1929)
-server.port=1929
-
 # Database Connection
 db.type=mysql
 db.jdbc-url=jdbc:mysql://127.0.0.1:3306/tpcc?useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
 db.username=root
 db.password=password
-
-# Connection Pool
 db.pool.size=50
 db.pool.min-idle=10
+
+# SSH (for remote database host metrics)
+db.ssh.enabled=false
+db.ssh.host=192.168.1.100
+db.ssh.port=22
+db.ssh.username=root
+db.ssh.password=
 
 # Benchmark Settings
 benchmark.warehouses=10
@@ -208,7 +207,7 @@ benchmark.terminals=50
 benchmark.duration=60
 benchmark.think-time=false
 benchmark.load-concurrency=4
-benchmark.csv-load=false
+benchmark.load-mode=auto
 
 # Transaction Mix (TPC-C Standard, must total 100%)
 benchmark.mix.new-order=45

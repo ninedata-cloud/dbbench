@@ -2,61 +2,47 @@ package com.ninedata.dbbench.cli;
 
 import com.ninedata.dbbench.config.BenchmarkConfig;
 import com.ninedata.dbbench.config.DatabaseConfig;
-import com.ninedata.dbbench.database.DatabaseAdapter;
-import com.ninedata.dbbench.database.DatabaseFactory;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
 import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
-import java.util.Map;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Command(name = "dbbench", mixinStandardHelpOptions = true, version = "1.0.0",
-        description = "NineData DBBench - TPC-C Database Benchmark Tool")
+        description = "NineData DBBench - TPC-C Database Benchmark Tool%n%n" +
+                "Usage examples:%n" +
+                "  dbbench -f config.properties load        Load test data%n" +
+                "  dbbench -f config.properties run         Run benchmark%n" +
+                "  dbbench -f config.properties clean       Clean data%n" +
+                "  dbbench -f config.properties clean load run%n")
 public class CLIRunner implements Callable<Integer> {
 
-    // Database connection options
-    @Option(names = {"--jdbcurl"}, required = true,
-            description = "JDBC URL (e.g., jdbc:mysql://host:3306/db, jdbc:postgresql://host:5432/db)")
-    private String jdbcUrl;
+    @Option(names = {"-f", "--config"}, required = true,
+            description = "Configuration file path (profiles/*.properties)")
+    private String configFile;
 
-    @Option(names = {"-u", "--user"}, description = "Database username", defaultValue = "root")
-    private String username;
+    // Optional overrides
+    @Option(names = {"-w", "--warehouses"}, description = "Override warehouses count")
+    private Integer warehouses;
 
-    @Option(names = {"-p", "--password"}, description = "Database password", defaultValue = "")
-    private String password;
+    @Option(names = {"-c", "--terminals"}, description = "Override terminal count")
+    private Integer terminals;
 
-    @Option(names = {"--pool-size"}, description = "Connection pool size", defaultValue = "50")
-    private int poolSize;
+    @Option(names = {"-d", "--duration"}, description = "Override test duration (seconds)")
+    private Integer duration;
 
-    // Benchmark options
-    @Option(names = {"-w", "--warehouses"}, description = "Number of warehouses", defaultValue = "1")
-    private int warehouses;
-
-    @Option(names = {"-c", "--terminals"}, description = "Number of terminals (concurrent threads)", defaultValue = "10")
-    private int terminals;
-
-    @Option(names = {"-d", "--duration"}, description = "Test duration in seconds", defaultValue = "60")
-    private int duration;
-
-    @Option(names = {"--load-threads"}, description = "Number of parallel threads for data loading", defaultValue = "4")
-    private int loadConcurrency;
-
-    @Option(names = {"--load-mode"}, description = "Data loading mode: auto (default, use CSV if supported), csv (force CSV), batch (force INSERT batch)", defaultValue = "auto")
-    private String loadMode;
-
-    // Run mode options
-    @Option(names = {"--load-only"}, description = "Only load data, don't run benchmark")
-    private boolean loadOnly;
-
-    @Option(names = {"--clean"}, description = "Clean existing data before loading")
-    private boolean clean;
+    @Parameters(description = "Actions: clean, load, run (can combine multiple)")
+    private List<String> actions;
 
     public static void run(String[] args) {
         int exitCode = new CommandLine(new CLIRunner()).execute(args);
@@ -67,149 +53,178 @@ public class CLIRunner implements Callable<Integer> {
     public Integer call() throws Exception {
         printBanner();
 
-        // Auto-detect database type from JDBC URL
-        String dbType = detectDatabaseType(jdbcUrl);
-        if (dbType == null) {
-            System.err.println("Error: Unable to detect database type from JDBC URL: " + jdbcUrl);
-            System.err.println("Supported formats: jdbc:mysql://, jdbc:postgresql://, jdbc:oracle:, jdbc:sqlserver://, jdbc:db2://, jdbc:dm://, jdbc:oceanbase://, jdbc:tidb://");
+        // Validate actions
+        if (actions == null || actions.isEmpty()) {
+            System.err.println("Error: No action specified. Use: clean, load, run");
+            return 1;
+        }
+        Set<String> validActions = Set.of("clean", "load", "run");
+        for (String action : actions) {
+            if (!validActions.contains(action.toLowerCase())) {
+                System.err.println("Error: Unknown action '" + action + "'. Valid actions: clean, load, run");
+                return 1;
+            }
+        }
+        Set<String> actionSet = new LinkedHashSet<>();
+        actions.forEach(a -> actionSet.add(a.toLowerCase()));
+
+        // Load config file
+        Path configPath = Paths.get(configFile);
+        if (!Files.exists(configPath)) {
+            System.err.println("Error: Configuration file not found: " + configFile);
             return 1;
         }
 
-        // Configure database
+        Properties props = new Properties();
+        try (Reader reader = Files.newBufferedReader(configPath)) {
+            props.load(reader);
+        }
+        System.out.println("  Config: " + configPath.toAbsolutePath());
+        System.out.println("  Actions: " + String.join(" → ", actionSet));
+
+        // Build DatabaseConfig
         DatabaseConfig dbConfig = new DatabaseConfig();
-        dbConfig.setType(dbType);
-        dbConfig.setJdbcUrl(jdbcUrl);
-        dbConfig.setUsername(username);
-        dbConfig.setPassword(password);
-        dbConfig.getPool().setSize(poolSize);
+        dbConfig.setType(props.getProperty("db.type", "mysql"));
+        dbConfig.setJdbcUrl(props.getProperty("db.jdbc-url", ""));
+        dbConfig.setUsername(props.getProperty("db.username", "root"));
+        dbConfig.setPassword(props.getProperty("db.password", ""));
+        dbConfig.getPool().setSize(intVal(props, "db.pool.size", 50));
+        dbConfig.getPool().setMinIdle(intVal(props, "db.pool.min-idle", 10));
 
-        // Configure benchmark
+        // SSH config
+        dbConfig.getSsh().setEnabled(Boolean.parseBoolean(props.getProperty("db.ssh.enabled", "false")));
+        dbConfig.getSsh().setHost(props.getProperty("db.ssh.host", ""));
+        dbConfig.getSsh().setPort(intVal(props, "db.ssh.port", 22));
+        dbConfig.getSsh().setUsername(props.getProperty("db.ssh.username", "root"));
+        dbConfig.getSsh().setPassword(props.getProperty("db.ssh.password", ""));
+        dbConfig.getSsh().setPrivateKey(props.getProperty("db.ssh.private-key", ""));
+
+        // Build BenchmarkConfig
         BenchmarkConfig benchConfig = new BenchmarkConfig();
-        benchConfig.setWarehouses(warehouses);
-        benchConfig.setTerminals(terminals);
-        benchConfig.setDuration(duration);
-        benchConfig.setLoadConcurrency(loadConcurrency);
-        benchConfig.setLoadMode(loadMode);
+        benchConfig.setWarehouses(intVal(props, "benchmark.warehouses", 10));
+        benchConfig.setTerminals(intVal(props, "benchmark.terminals", 50));
+        benchConfig.setDuration(intVal(props, "benchmark.duration", 60));
+        benchConfig.setThinkTime(Boolean.parseBoolean(props.getProperty("benchmark.think-time", "false")));
+        benchConfig.setLoadConcurrency(intVal(props, "benchmark.load-concurrency", 4));
+        benchConfig.setLoadMode(props.getProperty("benchmark.load-mode", "auto"));
+        benchConfig.getMix().setNewOrder(intVal(props, "benchmark.mix.new-order", 45));
+        benchConfig.getMix().setPayment(intVal(props, "benchmark.mix.payment", 43));
+        benchConfig.getMix().setOrderStatus(intVal(props, "benchmark.mix.order-status", 4));
+        benchConfig.getMix().setDelivery(intVal(props, "benchmark.mix.delivery", 4));
+        benchConfig.getMix().setStockLevel(intVal(props, "benchmark.mix.stock-level", 4));
 
-        System.out.println("Configuration:");
-        System.out.printf("  Database Type: %s%n", dbType.toUpperCase());
-        System.out.printf("  JDBC URL:      %s%n", jdbcUrl);
-        System.out.printf("  Username:      %s%n", username);
-        System.out.printf("  Pool Size:     %d%n", poolSize);
-        System.out.println();
-        System.out.printf("  Warehouses:    %d%n", warehouses);
-        System.out.printf("  Terminals:     %d%n", terminals);
-        System.out.printf("  Duration:      %ds%n", duration);
-        System.out.printf("  Load Threads:  %d%n", loadConcurrency);
-        System.out.printf("  Load Mode:     %s%n", loadMode);
-        System.out.println();
+        // Apply command-line overrides
+        if (warehouses != null) benchConfig.setWarehouses(warehouses);
+        if (terminals != null) benchConfig.setTerminals(terminals);
+        if (duration != null) benchConfig.setDuration(duration);
 
+        // Validate JDBC URL
+        if (dbConfig.getJdbcUrl().isEmpty()) {
+            System.err.println("Error: db.jdbc-url is not set in config file");
+            return 1;
+        }
+
+        printConfig(dbConfig, benchConfig);
+
+        // Create engine
         MetricsRegistry metricsRegistry = new MetricsRegistry();
         ClientMetricsCollector clientMetricsCollector = new ClientMetricsCollector();
-        clientMetricsCollector.init();
         BenchmarkEngine engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
 
         try {
-            // Initialize
-            System.out.println("Initializing database connection...");
+            System.out.println("\n  Connecting to database...");
             engine.initialize();
-            System.out.println("Database connection established.");
-            System.out.println();
+            System.out.println("  Connected successfully.\n");
 
-            // Clean data if requested
-            if (clean) {
-                System.out.println("Cleaning existing data...");
+            // Execute actions in order
+            if (actionSet.contains("clean")) {
+                System.out.println("══════════════════════════════════════════");
+                System.out.println("  CLEAN DATA");
+                System.out.println("══════════════════════════════════════════");
                 engine.cleanData();
-                System.out.println("Data cleaned.");
-                System.out.println();
+                System.out.println("  Data cleaned successfully.\n");
             }
 
-            // Load data only if --load-only or --clean is specified
-            if (loadOnly || clean) {
-                System.out.println("Loading TPC-C data...");
+            if (actionSet.contains("load")) {
+                System.out.println("══════════════════════════════════════════");
+                System.out.println("  LOAD DATA");
+                System.out.println("══════════════════════════════════════════");
                 long loadStart = System.currentTimeMillis();
-                engine.loadData(System.out::println);
+                engine.loadData(msg -> System.out.println("  " + msg));
                 long loadTime = (System.currentTimeMillis() - loadStart) / 1000;
-                System.out.printf("Data loading completed in %d seconds.%n", loadTime);
-                System.out.println();
+                System.out.printf("  Data loaded in %d seconds.%n%n", loadTime);
             }
 
-            if (loadOnly) {
-                System.out.println("Load-only mode, skipping benchmark.");
-                return 0;
+            if (actionSet.contains("run")) {
+                System.out.println("══════════════════════════════════════════");
+                System.out.println("  RUN BENCHMARK");
+                System.out.printf("  Warehouses: %d  Terminals: %d  Duration: %ds%n",
+                        benchConfig.getWarehouses(), benchConfig.getTerminals(), benchConfig.getDuration());
+                System.out.println("══════════════════════════════════════════\n");
+
+                engine.start();
+
+                // Real-time metrics display
+                ScheduledExecutorService display = Executors.newSingleThreadScheduledExecutor();
+                display.scheduleAtFixedRate(() -> {
+                    Map<String, Object> m = metricsRegistry.getCurrentMetrics();
+                    if (m != null && m.containsKey("tps")) {
+                        System.out.printf("\r  TPS: %8.1f | Tx: %6d | Success: %5.1f%% | Latency: %6.2f ms",
+                                m.get("tps"), m.get("totalTransactions"),
+                                m.get("overallSuccessRate"), m.get("avgLatencyMs"));
+                    }
+                }, 1, 1, TimeUnit.SECONDS);
+
+                // Wait for benchmark to complete
+                Thread.sleep(benchConfig.getDuration() * 1000L + 2000);
+
+                display.shutdown();
+                engine.stop();
+
+                System.out.println("\n");
+                Map<String, Object> results = metricsRegistry.getCurrentMetrics();
+                if (results != null) {
+                    printResults(results);
+                }
             }
-
-            // Run benchmark
-            System.out.println("Starting benchmark...");
-            System.out.println("Press Ctrl+C to stop early.");
-            System.out.println();
-
-            // Start metrics display
-            ScheduledExecutorService displayScheduler = Executors.newSingleThreadScheduledExecutor();
-            displayScheduler.scheduleAtFixedRate(() -> {
-                Map<String, Object> metrics = metricsRegistry.getCurrentMetrics();
-                System.out.printf("\rTPS: %.2f | Total: %d | Success: %.1f%% | Avg Latency: %.2fms | Elapsed: %ds",
-                        metrics.get("tps"),
-                        metrics.get("totalTransactions"),
-                        metrics.get("overallSuccessRate"),
-                        metrics.get("avgLatencyMs"),
-                        metrics.get("elapsedSeconds"));
-            }, 1, 1, TimeUnit.SECONDS);
-
-            engine.start();
-
-            // Wait for completion
-            Thread.sleep(duration * 1000L + 2000);
-
-            displayScheduler.shutdown();
-            System.out.println();
-            System.out.println();
-
-            // Print final results
-            printResults(metricsRegistry.getCurrentMetrics());
 
             return 0;
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("\nError: " + e.getMessage());
             e.printStackTrace();
             return 1;
         } finally {
-            engine.shutdown();
+            engine.stop();
         }
     }
 
-    /**
-     * Auto-detect database type from JDBC URL
-     */
-    private String detectDatabaseType(String url) {
-        if (url == null) return null;
-        String lowerUrl = url.toLowerCase();
+    private int intVal(Properties props, String key, int defaultVal) {
+        String val = props.getProperty(key);
+        if (val == null) return defaultVal;
+        try {
+            return Integer.parseInt(val.trim());
+        } catch (NumberFormatException e) {
+            return defaultVal;
+        }
+    }
 
-        if (lowerUrl.startsWith("jdbc:mysql://")) {
-            return "mysql";
-        } else if (lowerUrl.startsWith("jdbc:postgresql://")) {
-            return "postgresql";
-        } else if (lowerUrl.startsWith("jdbc:oracle:")) {
-            return "oracle";
-        } else if (lowerUrl.startsWith("jdbc:sqlserver://")) {
-            return "sqlserver";
-        } else if (lowerUrl.startsWith("jdbc:db2://")) {
-            return "db2";
-        } else if (lowerUrl.startsWith("jdbc:dm://")) {
-            return "dameng";
-        } else if (lowerUrl.startsWith("jdbc:oceanbase://")) {
-            return "oceanbase";
-        } else if (lowerUrl.startsWith("jdbc:tidb://")) {
-            return "tidb";
-        }
-        // TiDB and OceanBase often use MySQL protocol
-        if (lowerUrl.contains("tidb") || lowerUrl.contains(":4000/")) {
-            return "tidb";
-        }
-        if (lowerUrl.contains("oceanbase") || lowerUrl.contains(":2881/")) {
-            return "oceanbase";
-        }
-        return null;
+    private void printConfig(DatabaseConfig db, BenchmarkConfig bench) {
+        System.out.println("\n  ┌─────────────────────────────────────────┐");
+        System.out.println("  │           Configuration                 │");
+        System.out.println("  ├─────────────────────────────────────────┤");
+        System.out.printf("  │  Database:    %-26s│%n", db.getType());
+        System.out.printf("  │  JDBC URL:    %-26s│%n", truncate(db.getJdbcUrl(), 26));
+        System.out.printf("  │  User:        %-26s│%n", db.getUsername());
+        System.out.printf("  │  Pool Size:   %-26d│%n", db.getPool().getSize());
+        System.out.printf("  │  Warehouses:  %-26d│%n", bench.getWarehouses());
+        System.out.printf("  │  Terminals:   %-26d│%n", bench.getTerminals());
+        System.out.printf("  │  Duration:    %-26s│%n", bench.getDuration() + "s");
+        System.out.printf("  │  Load Mode:   %-26s│%n", bench.getLoadMode());
+        System.out.println("  └─────────────────────────────────────────┘");
+    }
+
+    private String truncate(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max - 3) + "...";
     }
 
     private void printBanner() {
@@ -234,13 +249,23 @@ public class CLIRunner implements Callable<Integer> {
         System.out.println("╔═══════════════════════════════════════════════════════════╗");
         System.out.println("║                    BENCHMARK RESULTS                      ║");
         System.out.println("╠═══════════════════════════════════════════════════════════╣");
-        System.out.printf("║  Throughput (TPS):        %10.2f                      ║%n", metrics.get("tps"));
-        System.out.printf("║  Total Transactions:      %10d                      ║%n", metrics.get("totalTransactions"));
-        System.out.printf("║  Successful:              %10d                      ║%n", metrics.get("totalSuccess"));
-        System.out.printf("║  Failed:                  %10d                      ║%n", metrics.get("totalFailure"));
-        System.out.printf("║  Success Rate:            %10.2f%%                     ║%n", metrics.get("overallSuccessRate"));
-        System.out.printf("║  Average Latency:         %10.2f ms                   ║%n", metrics.get("avgLatencyMs"));
-        System.out.printf("║  Duration:                %10d seconds               ║%n", metrics.get("elapsedSeconds"));
+        System.out.printf("║  Throughput (TPS):        %10.2f                      ║%n", toDouble(metrics.get("tps")));
+        System.out.printf("║  Total Transactions:      %10d                      ║%n", toInt(metrics.get("totalTransactions")));
+        System.out.printf("║  Successful:              %10d                      ║%n", toInt(metrics.get("totalSuccess")));
+        System.out.printf("║  Failed:                  %10d                      ║%n", toInt(metrics.get("totalFailure")));
+        System.out.printf("║  Success Rate:            %10.2f%%                     ║%n", toDouble(metrics.get("overallSuccessRate")));
+        System.out.printf("║  Average Latency:         %10.2f ms                   ║%n", toDouble(metrics.get("avgLatencyMs")));
+        System.out.printf("║  Duration:                %10d seconds               ║%n", toInt(metrics.get("elapsedSeconds")));
         System.out.println("╚═══════════════════════════════════════════════════════════╝");
+    }
+
+    private double toDouble(Object val) {
+        if (val instanceof Number) return ((Number) val).doubleValue();
+        return 0.0;
+    }
+
+    private int toInt(Object val) {
+        if (val instanceof Number) return ((Number) val).intValue();
+        return 0;
     }
 }

@@ -174,6 +174,27 @@ docker run -d -p 1929:1929 -p 5432:5432 --name dbbench ninedata/dbbench:latest
 - 行锁等待
 - 慢查询数
 
+## CLI 模式
+
+除 Web UI 外，也支持命令行模式，使用配置文件驱动：
+
+```bash
+# 进入容器
+docker exec -it dbbench bash
+
+# 加载数据
+java -jar /app/dbbench.jar -f /app/profiles/config.properties load
+
+# 运行测试
+java -jar /app/dbbench.jar -f /app/profiles/config.properties run
+
+# 组合操作：清理 → 加载 → 运行
+java -jar /app/dbbench.jar -f /app/profiles/config.properties clean load run
+
+# 覆盖部分参数
+java -jar /app/dbbench.jar -f /app/profiles/config.properties -w 20 -c 100 -d 300 run
+```
+
 ## 源码与文档
 
 - GitHub: https://github.com/yzsind/dbbench

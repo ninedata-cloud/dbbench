@@ -177,6 +177,27 @@ docker run -d -p 1929:1929 -p 5432:5432 --name dbbench yzsind/dbbench:latest
 - Disk I/O (bytes/sec)
 
 
+## CLI Mode
+
+In addition to the Web UI, CLI mode is also supported using configuration files:
+
+```bash
+# Enter container
+docker exec -it dbbench bash
+
+# Load data
+java -jar /app/dbbench.jar -f /app/profiles/config.properties load
+
+# Run benchmark
+java -jar /app/dbbench.jar -f /app/profiles/config.properties run
+
+# Combine actions: clean → load → run
+java -jar /app/dbbench.jar -f /app/profiles/config.properties clean load run
+
+# Override specific settings
+java -jar /app/dbbench.jar -f /app/profiles/config.properties -w 20 -c 100 -d 300 run
+```
+
 ## Source Code & Documentation
 
 - GitHub: https://github.com/yzsind/dbbench
