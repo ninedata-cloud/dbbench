@@ -11,5 +11,5 @@
  | |_| | |_) | |_) |  __/ | | | (__| | | |
  |____/|____/|____/ \___|_| |_|\___|_| |_|
 
-  :: TPC-C Database Benchmark Tool ::     (v${application.version:1.0.0})
+  :: TPC-C Database Benchmark Tool ::     (v${application.version:0.6.0})
 

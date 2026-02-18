@@ -1,5 +1,6 @@
 package com.ninedata.dbbench.metrics;
 
+import com.ninedata.dbbench.tpcc.transaction.TransactionResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,7 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should record successful transaction")
     void testRecordSuccessfulTransaction() {
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         TransactionMetrics metrics = registry.getOrCreate("NEW_ORDER");
         assertEquals(1, metrics.getCount());
@@ -54,7 +55,7 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should record failed transaction")
     void testRecordFailedTransaction() {
-        registry.recordTransaction("NEW_ORDER", false, 1_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.ERROR, 1_000_000);
 
         TransactionMetrics metrics = registry.getOrCreate("NEW_ORDER");
         assertEquals(1, metrics.getCount());
@@ -65,8 +66,8 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should reset all metrics")
     void testReset() {
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
-        registry.recordTransaction("PAYMENT", true, 2_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
+        registry.recordTransaction("PAYMENT", TransactionResult.SUCCESS, 2_000_000);
 
         registry.reset();
 
@@ -79,10 +80,10 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should calculate current metrics correctly")
     void testGetCurrentMetrics() {
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
-        registry.recordTransaction("NEW_ORDER", true, 2_000_000);
-        registry.recordTransaction("PAYMENT", true, 3_000_000);
-        registry.recordTransaction("PAYMENT", false, 4_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 2_000_000);
+        registry.recordTransaction("PAYMENT", TransactionResult.SUCCESS, 3_000_000);
+        registry.recordTransaction("PAYMENT", TransactionResult.ERROR, 4_000_000);
 
         Map<String, Object> metrics = registry.getCurrentMetrics();
 
@@ -99,7 +100,7 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should take snapshot with all metrics")
     void testTakeSnapshot() {
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         Map<String, Object> dbMetrics = new HashMap<>();
         dbMetrics.put("connections", 10);
@@ -122,7 +123,7 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should handle null metrics in snapshot")
     void testTakeSnapshotWithNullMetrics() {
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         registry.takeSnapshot(null, null);
 
@@ -153,7 +154,7 @@ class MetricsRegistryTest {
 
         // Record some transactions
         for (int i = 0; i < 100; i++) {
-            registry.recordTransaction("NEW_ORDER", true, 1_000_000);
+            registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
         }
 
         // Wait a bit to have elapsed time
@@ -162,7 +163,7 @@ class MetricsRegistryTest {
         Map<String, Object> metrics = registry.getCurrentMetrics();
 
         // TPS should be positive
-        double tps = (Double) metrics.get("tps");
+        double tps = ((Number) metrics.get("tps")).doubleValue();
         assertTrue(tps > 0, "TPS should be positive");
     }
 
@@ -170,7 +171,7 @@ class MetricsRegistryTest {
     @DisplayName("Should mark end time correctly")
     void testMarkEnd() throws InterruptedException {
         registry.reset();
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         Thread.sleep(50);
         registry.markEnd();
@@ -199,11 +200,11 @@ class MetricsRegistryTest {
     @Test
     @DisplayName("Should handle multiple transaction types")
     void testMultipleTransactionTypes() {
-        registry.recordTransaction("NEW_ORDER", true, 1_000_000);
-        registry.recordTransaction("PAYMENT", true, 2_000_000);
-        registry.recordTransaction("ORDER_STATUS", true, 3_000_000);
-        registry.recordTransaction("DELIVERY", true, 4_000_000);
-        registry.recordTransaction("STOCK_LEVEL", true, 5_000_000);
+        registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
+        registry.recordTransaction("PAYMENT", TransactionResult.SUCCESS, 2_000_000);
+        registry.recordTransaction("ORDER_STATUS", TransactionResult.SUCCESS, 3_000_000);
+        registry.recordTransaction("DELIVERY", TransactionResult.SUCCESS, 4_000_000);
+        registry.recordTransaction("STOCK_LEVEL", TransactionResult.SUCCESS, 5_000_000);
 
         Map<String, Object> metrics = registry.getCurrentMetrics();
 

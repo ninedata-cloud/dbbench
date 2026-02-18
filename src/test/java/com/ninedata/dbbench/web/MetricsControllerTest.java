@@ -6,6 +6,7 @@ import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
 import com.ninedata.dbbench.metrics.MetricsSnapshot;
 import com.ninedata.dbbench.metrics.ClientMetricsCollector;
+import com.ninedata.dbbench.tpcc.transaction.TransactionResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -67,7 +68,7 @@ class MetricsControllerTest {
     void testHistoryWithSnapshots() {
         // Add some snapshots
         metricsRegistry.reset();
-        metricsRegistry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        metricsRegistry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
         metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
         metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
 
@@ -101,7 +102,7 @@ class MetricsControllerTest {
     void testTpsHistory() {
         // Add some snapshots with TPS data
         metricsRegistry.reset();
-        metricsRegistry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        metricsRegistry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
         metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
 
         ResponseEntity<?> response = controller.tpsHistory(60);
@@ -145,7 +146,7 @@ class MetricsControllerTest {
     @DisplayName("Current metrics should include transaction metrics")
     void testCurrentIncludesTransactionMetrics() {
         metricsRegistry.reset();
-        metricsRegistry.recordTransaction("NEW_ORDER", true, 1_000_000);
+        metricsRegistry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         ResponseEntity<Map<String, Object>> response = controller.current();
 

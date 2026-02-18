@@ -114,7 +114,7 @@ Some databases require proprietary JDBC drivers that are not available in Maven 
 Place the driver JAR in the classpath when running:
 
 ```bash
-java -cp "target/dbbench-1.0.0.jar:drivers/*" com.ninedata.dbbench.DBBenchApplication
+java -cp "target/dbbench-0.6.0.jar:drivers/*" com.ninedata.dbbench.DBBenchApplication
 ```
 
 Or install to your local Maven repository:
@@ -130,7 +130,7 @@ mvn install:install-file -Dfile=jconn4.jar -DgroupId=com.sybase -DartifactId=jco
 Start the web server:
 
 ```bash
-java -jar target/dbbench-1.0.0.jar
+java -jar target/dbbench-0.6.0.jar
 ```
 
 Open http://localhost:1929 in your browser.
@@ -148,19 +148,19 @@ CLI mode reads all configuration from a profile file (`-f`), the same format use
 
 ```bash
 # Load test data
-java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties load
+java -jar target/dbbench-0.6.0.jar -f profiles/local-mysql.properties load
 
 # Run benchmark (data must be loaded first)
-java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties run
+java -jar target/dbbench-0.6.0.jar -f profiles/local-mysql.properties run
 
 # Clean existing data
-java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties clean
+java -jar target/dbbench-0.6.0.jar -f profiles/local-mysql.properties clean
 
 # Combine actions: clean → load → run
-java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties clean load run
+java -jar target/dbbench-0.6.0.jar -f profiles/local-mysql.properties clean load run
 
 # Override specific settings from config file
-java -jar target/dbbench-1.0.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
+java -jar target/dbbench-0.6.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
 ```
 
 ## CLI Options
