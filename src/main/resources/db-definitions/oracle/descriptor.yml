@@ -1,0 +1,36 @@
+name: Oracle
+type: oracle
+driver: oracle.jdbc.OracleDriver
+url: "jdbc:oracle:thin:@{host}:{port}:{database}"
+validation: "SELECT 1 FROM DUAL"
+noLimit: true
+rowIdForUpdate: true
+dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
+init:
+  - "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
+csvLoad:
+  batch: 1000
+  hint: "/*+ APPEND_VALUES*/"
+metrics:
+  - active_connections: "SELECT COUNT(*) FROM V$SESSION WHERE STATUS = 'ACTIVE' AND TYPE = 'USER'"
+  - buffer_pool_hit_ratio: >
+      SELECT (1 - (phy.value / (cur.value + con.value))) * 100
+      FROM V$SYSSTAT phy, V$SYSSTAT cur, V$SYSSTAT con
+      WHERE phy.name = 'physical reads' AND cur.name = 'db block gets'
+      AND con.name = 'consistent gets' AND (cur.value + con.value) > 0
+  - lock_waits: "SELECT COUNT(*) FROM V$SESSION WHERE BLOCKING_SESSION IS NOT NULL"
+hostMetrics:
+  - sql: >
+      SELECT
+      (SELECT VALUE FROM V$SYSMETRIC WHERE METRIC_NAME = 'Host CPU Utilization (%)' AND GROUP_ID = 2 AND ROWNUM = 1) AS cpuUsage,
+      (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'NUM_CPUS') AS cpuCores,
+      (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'PHYSICAL_MEMORY_BYTES') AS memTotalBytes,
+      (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'FREE_MEMORY_BYTES') AS memFreeBytes
+      FROM DUAL
+  - sql: >
+      SELECT SUM(PHYBLKRD) * 8192 as diskReadBytes, SUM(PHYBLKWRT) * 8192 as diskWriteBytes
+      FROM V$FILESTAT
+  - sql: >
+      SELECT SUM(CASE WHEN name LIKE 'bytes received via%' THEN value ELSE 0 END) AS networkRecvBytes,
+      SUM(CASE WHEN name LIKE 'bytes sent via%' THEN value ELSE 0 END) AS networkSentBytes
+      FROM V$SYSSTAT WHERE name LIKE 'bytes%via SQL*Net%'

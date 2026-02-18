@@ -117,6 +117,17 @@
             <!-- Database Metrics -->
             <div class="card">
                 <h3>Database Metrics</h3>
+                <div class="hw-info-section" id="dbHwInfo">
+                    <div class="hw-info-toggle" onclick="toggleHwInfo('dbHwInfo')">Server Hardware Info <span class="hw-info-arrow">&#9654;</span></div>
+                    <div class="hw-info-grid" style="display:none;">
+                        <div class="hw-info-item"><span class="hw-info-label">OS</span><span class="hw-info-value" id="dbHwOs">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">CPU</span><span class="hw-info-value" id="dbHwCpu">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Cores</span><span class="hw-info-value" id="dbHwCores">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Memory</span><span class="hw-info-value" id="dbHwMemory">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Disk</span><span class="hw-info-value" id="dbHwDisk">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Network</span><span class="hw-info-value" id="dbHwNetwork">-</span></div>
+                    </div>
+                </div>
                 <div class="metric">
                     <span class="metric-label">CPU Usage</span>
                     <span class="metric-value" id="dbCpuUsage">-</span>
@@ -141,6 +152,17 @@
             <!-- System Resources -->
             <div class="card">
                 <h3>Client Metrics</h3>
+                <div class="hw-info-section" id="clientHwInfo">
+                    <div class="hw-info-toggle" onclick="toggleHwInfo('clientHwInfo')">Client Hardware Info <span class="hw-info-arrow">&#9654;</span></div>
+                    <div class="hw-info-grid" style="display:none;">
+                        <div class="hw-info-item"><span class="hw-info-label">OS</span><span class="hw-info-value" id="clientHwOs">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">CPU</span><span class="hw-info-value" id="clientHwCpu">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Cores</span><span class="hw-info-value" id="clientHwCores">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Memory</span><span class="hw-info-value" id="clientHwMemory">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Disk</span><span class="hw-info-value" id="clientHwDisk">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Network</span><span class="hw-info-value" id="clientHwNetwork">-</span></div>
+                    </div>
+                </div>
                 <div class="metric">
                     <span class="metric-label">Client CPU Usage</span>
                     <span class="metric-value" id="cpuUsage">0%</span>
@@ -265,6 +287,15 @@
                 <button class="modal-close" onclick="closeModal('configModal')">&times;</button>
             </div>
             <div class="modal-body">
+                <!-- Profile Management Bar -->
+                <div class="profile-bar">
+                    <select id="profileSelect" class="profile-select" onchange="onProfileChange()">
+                        <option value="default">default</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" onclick="saveProfile()">Save As</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteProfile()">Delete</button>
+                </div>
+
                 <!-- Database Configuration -->
                 <div class="form-section">
                     <div class="form-section-title">Database Connection</div>
@@ -272,19 +303,7 @@
                         <div class="form-group">
                             <label for="cfgFormDbType">Database Type</label>
                             <select id="cfgFormDbType">
-                                <option value="mysql">MySQL</option>
-                                <option value="tidb">TiDB</option>
-                                <option value="postgresql">PostgreSQL</option>
-                                <option value="oracle">Oracle</option>
-                                <option value="sqlserver">SQL Server</option>
-                                <option value="db2">DB2</option>
-                                <option value="dameng">Dameng</option>
-                                <option value="oceanbase">OceanBase</option>
-                                <option value="sqlite">SQLite</option>
-                                <option value="yashandb">YashanDB</option>
-                                <option value="gbase8s">GBase 8s</option>
-                                <option value="sybase">Sybase</option>
-                                <option value="hana">SAP HANA</option>
+                                <!-- Populated dynamically from /api/benchmark/database-types -->
                             </select>
                         </div>
                         <div class="form-group">
@@ -457,6 +476,23 @@
             <div class="modal-footer">
                 <button class="btn btn-danger" onclick="clearLogs()">Clear All Logs</button>
                 <button class="btn btn-secondary" onclick="closeModal('logModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal modal-confirm">
+            <div class="modal-header">
+                <h2 id="confirmTitle">Confirm</h2>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn" id="confirmBtn" onclick="executeConfirm()">Confirm</button>
             </div>
         </div>
     </div>

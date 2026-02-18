@@ -1,0 +1,33 @@
+name: PostgreSQL
+type: postgresql
+aliases:
+  - postgres
+driver: org.postgresql.Driver
+url: "jdbc:postgresql://{host}:{port}/{database}"
+dropStatement: "DROP TABLE IF EXISTS ${tableName} CASCADE"
+csvLoad: pg_copy
+metrics:
+  - sql: >
+      SELECT numbackends as active_connections, xact_commit as commits,
+      xact_rollback as rollbacks, blks_read as blocks_read, blks_hit as blocks_hit,
+      tup_returned as rows_returned, tup_fetched as rows_fetched,
+      tup_inserted as rows_inserted, tup_updated as rows_updated, tup_deleted as rows_deleted
+      FROM pg_stat_database WHERE datname = current_database()
+  - waiting_locks: "SELECT count(*) FROM pg_locks WHERE NOT granted"
+  - cache_hit_ratio: "(blocks_hit / (blocks_hit + blocks_read)) * 100"
+    computed: true
+hostMetrics:
+  - sql: "SELECT buffers_clean, buffers_alloc FROM pg_stat_bgwriter"
+    map:
+      buffers_clean: buffers_clean
+      buffers_alloc: buffersAllocated
+  - sql: "SELECT blks_read * 8192 as diskReadBytes FROM pg_stat_database WHERE datname = current_database()"
+  - sql: >
+      SELECT sum(blk_read_time) as diskReadTimeMs, sum(blk_write_time) as diskWriteTimeMs
+      FROM pg_stat_database WHERE datname = current_database()
+  - sql: >
+      SELECT COUNT(*) FILTER (WHERE state = 'active') as activeQueries,
+      COUNT(*) as totalConnections,
+      COUNT(*) FILTER (WHERE wait_event_type IS NOT NULL) as waitingQueries
+      FROM pg_stat_activity WHERE backend_type = 'client backend'
+  - sql: "SELECT setting::bigint * 8192 as sharedBuffersBytes FROM pg_settings WHERE name = 'shared_buffers'"

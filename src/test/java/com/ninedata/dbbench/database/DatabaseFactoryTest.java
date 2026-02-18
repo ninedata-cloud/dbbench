@@ -1,6 +1,9 @@
 package com.ninedata.dbbench.database;
 
 import com.ninedata.dbbench.config.DatabaseConfig;
+import com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry;
+import com.ninedata.dbbench.database.plugin.ScriptBasedAdapter;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -12,126 +15,116 @@ class DatabaseFactoryTest {
 
     private DatabaseConfig config;
 
+    @BeforeAll
+    static void initRegistry() {
+        if (DatabaseDefinitionRegistry.getInstance() == null) {
+            new DatabaseDefinitionRegistry().init();
+        }
+    }
+
     @BeforeEach
     void setUp() {
         config = new DatabaseConfig();
     }
 
     @Test
-    @DisplayName("Should create MySQLAdapter for mysql type")
+    @DisplayName("Should create adapter for mysql type")
     void testCreateMySQLAdapter() {
         config.setType("mysql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof MySQLAdapter);
+        assertInstanceOf(ScriptBasedAdapter.class, adapter);
         assertEquals("MySQL", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create PostgreSQLAdapter for postgresql type")
+    @DisplayName("Should create adapter for postgresql type")
     void testCreatePostgreSQLAdapter() {
         config.setType("postgresql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof PostgreSQLAdapter);
+        assertInstanceOf(ScriptBasedAdapter.class, adapter);
         assertEquals("PostgreSQL", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create PostgreSQLAdapter for postgres type")
+    @DisplayName("Should create adapter for postgres alias")
     void testCreatePostgresAdapter() {
         config.setType("postgres");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof PostgreSQLAdapter);
+        assertInstanceOf(ScriptBasedAdapter.class, adapter);
     }
 
     @Test
-    @DisplayName("Should create OracleAdapter for oracle type")
+    @DisplayName("Should create adapter for oracle type")
     void testCreateOracleAdapter() {
         config.setType("oracle");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof OracleAdapter);
         assertEquals("Oracle", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create SQLServerAdapter for sqlserver type")
+    @DisplayName("Should create adapter for sqlserver type")
     void testCreateSQLServerAdapter() {
         config.setType("sqlserver");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof SQLServerAdapter);
         assertEquals("SQL Server", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create SQLServerAdapter for mssql type")
+    @DisplayName("Should create adapter for mssql alias")
     void testCreateMSSQLAdapter() {
         config.setType("mssql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof SQLServerAdapter);
+        assertInstanceOf(ScriptBasedAdapter.class, adapter);
     }
 
     @Test
-    @DisplayName("Should create DB2Adapter for db2 type")
+    @DisplayName("Should create adapter for db2 type")
     void testCreateDB2Adapter() {
         config.setType("db2");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof DB2Adapter);
         assertEquals("DB2", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create DamengAdapter for dameng type")
+    @DisplayName("Should create adapter for dameng type")
     void testCreateDamengAdapter() {
         config.setType("dameng");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof DamengAdapter);
         assertEquals("Dameng", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create DamengAdapter for dm type")
+    @DisplayName("Should create adapter for dm alias")
     void testCreateDMAdapter() {
         config.setType("dm");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof DamengAdapter);
+        assertInstanceOf(ScriptBasedAdapter.class, adapter);
     }
 
     @Test
-    @DisplayName("Should create OceanBaseAdapter for oceanbase type")
+    @DisplayName("Should create adapter for oceanbase type")
     void testCreateOceanBaseAdapter() {
         config.setType("oceanbase");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof OceanBaseAdapter);
         assertEquals("OceanBase", adapter.getDatabaseType());
     }
 
     @Test
-    @DisplayName("Should create TiDBAdapter for tidb type")
+    @DisplayName("Should create adapter for tidb type")
     void testCreateTiDBAdapter() {
         config.setType("tidb");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertNotNull(adapter);
-        assertTrue(adapter instanceof TiDBAdapter);
         assertEquals("TiDB", adapter.getDatabaseType());
     }
 
@@ -139,29 +132,26 @@ class DatabaseFactoryTest {
     @DisplayName("Should throw exception for unsupported type")
     void testUnsupportedType() {
         config.setType("unsupported");
-
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
             () -> DatabaseFactory.create(config)
         );
-
         assertTrue(exception.getMessage().contains("Unsupported database type"));
-        assertTrue(exception.getMessage().contains("unsupported"));
     }
 
     @Test
     @DisplayName("Should be case insensitive for type")
     void testCaseInsensitive() {
         config.setType("MYSQL");
-        DatabaseAdapter adapter1 = DatabaseFactory.create(config);
-        assertTrue(adapter1 instanceof MySQLAdapter);
+        DatabaseAdapter a1 = DatabaseFactory.create(config);
+        assertInstanceOf(ScriptBasedAdapter.class, a1);
 
         config.setType("MySQL");
-        DatabaseAdapter adapter2 = DatabaseFactory.create(config);
-        assertTrue(adapter2 instanceof MySQLAdapter);
+        DatabaseAdapter a2 = DatabaseFactory.create(config);
+        assertInstanceOf(ScriptBasedAdapter.class, a2);
 
         config.setType("PostgreSQL");
-        DatabaseAdapter adapter3 = DatabaseFactory.create(config);
-        assertTrue(adapter3 instanceof PostgreSQLAdapter);
+        DatabaseAdapter a3 = DatabaseFactory.create(config);
+        assertInstanceOf(ScriptBasedAdapter.class, a3);
     }
 }

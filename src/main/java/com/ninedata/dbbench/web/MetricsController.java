@@ -45,6 +45,11 @@ public class MetricsController {
         return ResponseEntity.ok(history.subList(start, history.size()));
     }
 
+    @GetMapping("/hardware-info")
+    public ResponseEntity<Map<String, Object>> hardwareInfo() {
+        return ResponseEntity.ok(engine.getHardwareInfo());
+    }
+
     /**
      * Get TPS history for chart restoration after page refresh
      */

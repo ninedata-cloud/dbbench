@@ -1,0 +1,25 @@
+name: Dameng
+type: dameng
+aliases:
+  - dm
+driver: dm.jdbc.driver.DmDriver
+url: "jdbc:dm://{host}:{port}/{database}"
+validation: "SELECT 1 FROM DUAL"
+noLimit: true
+rowIdForUpdate: true
+dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
+init:
+  - "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
+metrics:
+  - buffer_pool_hit_ratio: "SELECT RATIODBCR FROM V$BUFFERPOOL"
+  - active_connections: "SELECT COUNT(*) FROM V$SESSIONS WHERE STATE = 'ACTIVE'"
+  - lock_waits: "SELECT COUNT(*) FROM V$LOCK WHERE BLOCKED = 1"
+hostMetrics:
+  - sql: >
+      SELECT NAME, STAT_VAL FROM V$SYSTEMINFO
+      WHERE NAME IN ('OS_CPU_USER', 'OS_CPU_SYS', 'OS_MEM_TOTAL', 'OS_MEM_FREE')
+    map:
+      OS_CPU_USER: cpuUsage
+      OS_CPU_SYS: cpuSystem
+      OS_MEM_TOTAL: totalMemory
+      OS_MEM_FREE: freeMemory

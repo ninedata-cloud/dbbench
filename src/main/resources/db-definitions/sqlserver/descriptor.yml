@@ -1,0 +1,42 @@
+name: SQL Server
+type: sqlserver
+aliases:
+  - mssql
+driver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+url: "jdbc:sqlserver://{host}:{port};databaseName={database}"
+noLimit: true
+dropStatement: "IF EXISTS (SELECT 1 FROM sysobjects WHERE name='${tableName}') DROP TABLE ${tableName}"
+csvLoad:
+  batch: 5000
+metrics:
+  - active_connections: "SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE is_user_process = 1"
+  - buffer_pool_hit_ratio: >
+      SELECT (a.cntr_value * 1.0 / b.cntr_value) * 100.0
+      FROM sys.dm_os_performance_counters a
+      JOIN sys.dm_os_performance_counters b ON a.object_name = b.object_name
+      WHERE a.counter_name = 'Buffer cache hit ratio'
+      AND b.counter_name = 'Buffer cache hit ratio base' AND b.cntr_value > 0
+  - row_lock_waits: "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE request_status = 'WAIT'"
+  - batch_requests: "SELECT cntr_value FROM sys.dm_os_performance_counters WHERE counter_name = 'Batch Requests/sec'"
+hostMetrics:
+  - sql: >
+      SELECT physical_memory_kb / 1024 as memoryTotal,
+      committed_kb / 1024 as memoryUsed,
+      committed_target_kb / 1024 as memoryTarget
+      FROM sys.dm_os_sys_info
+  - sql: >
+      SELECT SUM(num_of_bytes_read) as diskReadBytes,
+      SUM(num_of_bytes_written) as diskWriteBytes,
+      SUM(io_stall_read_ms) as diskReadTimeMs,
+      SUM(io_stall_write_ms) as diskWriteTimeMs
+      FROM sys.dm_io_virtual_file_stats(NULL, NULL)
+  - pageLifeExpectancy: >
+      SELECT cntr_value
+      FROM sys.dm_os_performance_counters
+      WHERE counter_name = 'Page life expectancy' AND object_name LIKE '%Buffer Manager%'
+  - sql: >
+      SELECT COUNT(*) as activeQueries,
+      SUM(CASE WHEN wait_type IS NOT NULL THEN 1 ELSE 0 END) as waitingQueries
+      FROM sys.dm_exec_requests WHERE session_id > 50
+  - memoryUsage: "(memoryUsed / memoryTarget) * 100"
+    computed: true

@@ -1,0 +1,25 @@
+name: YashanDB
+type: yashandb
+aliases:
+  - yashan
+driver: com.yashandb.jdbc.Driver
+url: "jdbc:yasdb://{host}:{port}/{database}"
+validation: "SELECT 1 FROM DUAL"
+noLimit: true
+rowIdForUpdate: true
+dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
+init:
+  - "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
+metrics:
+  - active_connections: "SELECT COUNT(*) FROM V$SESSION WHERE STATUS = 'ACTIVE'"
+  - buffer_pool_hit_ratio: >
+      SELECT (1 - (phy.value / NULLIF(cur.value + con.value, 0))) * 100
+      FROM V$SYSSTAT phy, V$SYSSTAT cur, V$SYSSTAT con
+      WHERE phy.name = 'physical reads' AND cur.name = 'db block gets' AND con.name = 'consistent gets'
+  - lock_waits: "SELECT COUNT(*) FROM V$SESSION WHERE BLOCKING_SESSION IS NOT NULL"
+hostMetrics:
+  - sql: "SELECT STAT_NAME, VALUE FROM V$OSSTAT WHERE STAT_NAME IN ('NUM_CPUS', 'PHYSICAL_MEMORY_BYTES', 'FREE_MEMORY_BYTES')"
+    map:
+      NUM_CPUS: cpuCores
+      PHYSICAL_MEMORY_BYTES: memoryTotalBytes
+      FREE_MEMORY_BYTES: memoryFreeBytes

@@ -61,20 +61,13 @@ public class DatabaseConfig {
     }
 
     public String getDriverClassName() {
-        return switch (type.toLowerCase()) {
-            case "mysql", "tidb" -> "com.mysql.cj.jdbc.Driver";
-            case "postgresql" -> "org.postgresql.Driver";
-            case "oracle" -> "oracle.jdbc.OracleDriver";
-            case "sqlserver" -> "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-            case "db2" -> "com.ibm.db2.jcc.DB2Driver";
-            case "dameng" -> "dm.jdbc.driver.DmDriver";
-            case "oceanbase" -> "com.oceanbase.jdbc.Driver";
-            case "sqlite" -> "org.sqlite.JDBC";
-            case "yashandb", "yashan" -> "com.yashandb.jdbc.Driver";
-            case "gbase8s", "gbase" -> "com.gbasedbt.jdbc.Driver";
-            case "sybase", "ase" -> "com.sybase.jdbc4.jdbc.SybDriver";
-            case "hana", "saphana" -> "com.sap.db.jdbc.Driver";
-            default -> "com.mysql.cj.jdbc.Driver";
-        };
+        var registry = com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry.getInstance();
+        if (registry != null) {
+            var def = registry.getDefinition(type);
+            if (def != null && def.getDriverClassName() != null) {
+                return def.getDriverClassName();
+            }
+        }
+        return "com.mysql.cj.jdbc.Driver";
     }
 }

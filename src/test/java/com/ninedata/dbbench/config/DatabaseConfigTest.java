@@ -1,5 +1,7 @@
 package com.ninedata.dbbench.config;
 
+import com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +12,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class DatabaseConfigTest {
 
     private DatabaseConfig config;
+
+    @BeforeAll
+    static void initRegistry() {
+        if (DatabaseDefinitionRegistry.getInstance() == null) {
+            new DatabaseDefinitionRegistry().init();
+        }
+    }
 
     @BeforeEach
     void setUp() {

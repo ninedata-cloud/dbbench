@@ -1,0 +1,28 @@
+name: SAP HANA
+type: hana
+aliases:
+  - saphana
+driver: com.sap.db.jdbc.Driver
+url: "jdbc:sap://{host}:{port}"
+validation: "SELECT 1 FROM DUMMY"
+dropStatement: "DROP TABLE ${tableName} CASCADE"
+metrics:
+  - active_connections: "SELECT COUNT(*) FROM M_CONNECTIONS WHERE CONNECTION_STATUS = 'RUNNING'"
+  - total_connections: "SELECT COUNT(*) FROM M_CONNECTIONS"
+  - sql: >
+      SELECT SUM(MEMORY_SIZE_IN_TOTAL) as cs_total_memory,
+      SUM(MEMORY_SIZE_IN_MAIN) as cs_main_memory
+      FROM M_CS_ALL_COLUMNS
+  - lock_waits: "SELECT COUNT(*) FROM M_LOCK_WAITS_STATISTICS"
+  - plan_cache_hit_ratio: "SELECT PLAN_CACHE_HIT_RATIO FROM M_SQL_PLAN_CACHE_OVERVIEW"
+hostMetrics:
+  - sql: >
+      SELECT TOTAL_CPU_USER_TIME as cpuUser, TOTAL_CPU_SYSTEM_TIME as cpuSys,
+      TOTAL_CPU_IDLE_TIME as cpuIdle,
+      USED_PHYSICAL_MEMORY as memUsedBytes, FREE_PHYSICAL_MEMORY as memFreeBytes
+      FROM M_HOST_RESOURCE_UTILIZATION
+  - sql: >
+      SELECT SUM(TOTAL_READ_SIZE) as diskReadBytes, SUM(TOTAL_WRITE_SIZE) as diskWriteBytes
+      FROM M_VOLUME_IO_TOTAL_STATISTICS
+  - cpuUsage: "((cpuUser + cpuSys) / (cpuUser + cpuSys + cpuIdle)) * 100"
+    computed: true

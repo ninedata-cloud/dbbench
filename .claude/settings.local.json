@@ -15,7 +15,14 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "Bash(mvn clean compile:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(for db in oceanbase gbase8s sybase hana)",
+      "Bash(do echo -n \"$db tables: \")",
+      "Bash(test:*)",
+      "Bash(echo:*)",
+      "Bash(done)"
     ]
   }
 }

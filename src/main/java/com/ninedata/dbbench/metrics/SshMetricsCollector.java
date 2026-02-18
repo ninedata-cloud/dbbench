@@ -151,6 +151,150 @@ public class SshMetricsCollector {
         return sb.toString();
     }
 
+    // ==================== Hardware Info ====================
+
+    private static final String HW_INFO_CMD =
+            "uname -srm 2>/dev/null; echo '---SECTION---'; " +
+            "cat /etc/os-release 2>/dev/null; echo '---SECTION---'; " +
+            "lscpu 2>/dev/null; echo '---SECTION---'; " +
+            "grep MemTotal /proc/meminfo 2>/dev/null; echo '---SECTION---'; " +
+            "lsblk -d -o NAME,SIZE,MODEL -n 2>/dev/null; echo '---SECTION---'; " +
+            "ip -o link show 2>/dev/null || cat /proc/net/dev 2>/dev/null";
+
+    public synchronized Map<String, Object> collectHardwareInfo() {
+        Map<String, Object> hw = new LinkedHashMap<>();
+        if (!isConnected()) {
+            try { connect(); } catch (Exception e) {
+                log.warn("SSH connect failed for hardware info: ", e.getMessage());
+                return hw;
+            }
+        }
+        try {
+            String output = executeCommand(HW_INFO_CMD);
+            if (output == null || output.isEmpty()) return hw;
+
+            String[] sections = output.split("---SECTION---");
+
+            // Section 0: uname -srm
+            if (sections.length > 0) {
+                String uname = sections[0].trim();
+                // Section 1: /etc/os-release
+                String osName = uname;
+                if (sections.length > 1) {
+                    String prettyName = parsePrettyName(sections[1]);
+                    if (prettyName != null) osName = prettyName + " / " + uname;
+                }
+                hw.put("os", osName);
+            }
+
+            // Section 2: lscpu
+            if (sections.length > 2) {
+                parseLscpu(sections[2], hw);
+            }
+
+            // Section 3: MemTotal
+            if (sections.length > 3) {
+                String memLine = sections[3].trim();
+                if (memLine.startsWith("MemTotal:")) {
+                    long kb = parseKbValue(memLine);
+                    hw.put("memoryTotalGB", String.format("%.1f", kb / (1024.0 * 1024)));
+                }
+            }
+
+            // Section 4: lsblk
+            if (sections.length > 4) {
+                parseLsblk(sections[4], hw);
+            }
+
+            // Section 5: ip link / /proc/net/dev
+            if (sections.length > 5) {
+                parseNetworkInterfaces(sections[5], hw);
+            }
+        } catch (Exception e) {
+            log.warn("SSH hardware info collection failed: {}", e.getMessage());
+        }
+        return hw;
+    }
+
+    private String parsePrettyName(String osRelease) {
+        for (String line : osRelease.split("\n")) {
+            if (line.startsWith("PRETTY_NAME=")) {
+                return line.substring("PRETTY_NAME=".length()).replace("\"", "").trim();
+            }
+        }
+        return null;
+    }
+
+    private void parseLscpu(String section, Map<String, Object> hw) {
+        String modelName = null;
+        int sockets = 0, coresPerSocket = 0, threads = 0;
+        double mhz = 0;
+        for (String line : section.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("Model name:")) {
+                modelName = trimmed.substring("Model name:".length()).trim();
+            } else if (trimmed.startsWith("Socket(s):")) {
+                sockets = parseInt(trimmed.substring("Socket(s):".length()).trim());
+            } else if (trimmed.startsWith("Core(s) per socket:")) {
+                coresPerSocket = parseInt(trimmed.substring("Core(s) per socket:".length()).trim());
+            } else if (trimmed.startsWith("CPU(s):")) {
+                threads = parseInt(trimmed.substring("CPU(s):".length()).trim());
+            } else if (trimmed.startsWith("CPU MHz:") || trimmed.startsWith("CPU max MHz:")) {
+                String val = trimmed.contains(":") ? trimmed.substring(trimmed.indexOf(':') + 1).trim() : "";
+                try { mhz = Double.parseDouble(val); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (modelName != null) hw.put("cpu", modelName);
+        int physCores = sockets > 0 && coresPerSocket > 0 ? sockets * coresPerSocket : 0;
+        if (physCores > 0) hw.put("cpuPhysicalCores", physCores);
+        if (threads > 0) hw.put("cpuLogicalCores", threads);
+        if (mhz > 0) hw.put("cpuFreqMHz", (long) mhz);
+    }
+
+    private void parseLsblk(String section, Map<String, Object> hw) {
+        List<String> disks = new ArrayList<>();
+        for (String line : section.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            // Format: NAME SIZE MODEL (e.g. "sda  100G  VBOX HARDDISK")
+            String[] parts = trimmed.split("\\s+", 3);
+            if (parts.length >= 2) {
+                String name = parts[0];
+                String size = parts[1];
+                String model = parts.length > 2 ? parts[2].trim() : "";
+                if (!model.isEmpty()) {
+                    disks.add(model + " (" + size + ")");
+                } else {
+                    disks.add(name + " (" + size + ")");
+                }
+            }
+        }
+        hw.put("disks", disks.isEmpty() ? "-" : String.join(", ", disks));
+    }
+
+    private void parseNetworkInterfaces(String section, Map<String, Object> hw) {
+        List<String> nets = new ArrayList<>();
+        for (String line : section.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            // ip -o link format: "2: eth0: <...> ... "
+            if (trimmed.contains(": <")) {
+                String[] parts = trimmed.split(":\\s+", 3);
+                if (parts.length >= 2) {
+                    String iface = parts[1].replace(":", "").trim();
+                    if (isRealInterface(iface)) {
+                        nets.add(iface);
+                    }
+                }
+            }
+        }
+        hw.put("network", nets.isEmpty() ? "-" : String.join(", ", nets));
+    }
+
+    private int parseInt(String s) {
+        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return 0; }
+    }
+
     // ==================== /proc/stat parser ====================
 
     private void parseProcStat(String output, Map<String, Object> metrics, long now) {

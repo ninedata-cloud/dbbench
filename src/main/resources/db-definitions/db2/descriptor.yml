@@ -1,0 +1,35 @@
+name: DB2
+type: db2
+driver: com.ibm.db2.jcc.DB2Driver
+url: "jdbc:db2://{host}:{port}/{database}"
+validation: "SELECT 1 FROM SYSIBM.SYSDUMMY1"
+noLimit: true
+dropStatement: "DROP TABLE ${tableName}"
+csvLoad:
+  batch: 5000
+metrics:
+  - active_connections: "SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'UOWEXEC'"
+  - sql: >
+      SELECT POOL_DATA_L_READS + POOL_INDEX_L_READS AS logical_reads,
+      POOL_DATA_P_READS + POOL_INDEX_P_READS AS physical_reads
+      FROM TABLE(MON_GET_BUFFERPOOL(NULL, -2)) AS T
+    map:
+      logical_reads: logical_reads
+      physical_reads: physical_reads
+  - sql: "SELECT LOCK_WAITS, LOCK_WAIT_TIME / 1000 as lock_wait_time_ms FROM TABLE(MON_GET_DATABASE(-2)) AS T"
+    map:
+      LOCK_WAITS: lock_waits
+      lock_wait_time_ms: lock_wait_time_ms
+  - sql: "SELECT ROWS_READ, ROWS_INSERTED, ROWS_UPDATED, ROWS_DELETED FROM TABLE(MON_GET_DATABASE(-2)) AS T"
+  - total_connections: "SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS"
+  - buffer_pool_hit_ratio: "((logical_reads - physical_reads) / logical_reads) * 100"
+    computed: true
+hostMetrics:
+  - sql: >
+      SELECT CPU_USAGE_TOTAL as cpuUsage, MEMORY_TOTAL / 1024 as memoryTotal,
+      MEMORY_FREE / 1024 as memoryFree
+      FROM SYSIBMADM.ENV_SYS_RESOURCES
+  - sql: >
+      SELECT SUM(POOL_DATA_P_READS + POOL_INDEX_P_READS + POOL_XDA_P_READS) * 8192 as diskReadBytes,
+      SUM(POOL_DATA_WRITES + POOL_INDEX_WRITES + POOL_XDA_WRITES) * 8192 as diskWriteBytes
+      FROM TABLE(MON_GET_TABLESPACE(NULL, -2)) AS T

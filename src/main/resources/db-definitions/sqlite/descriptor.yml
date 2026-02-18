@@ -1,0 +1,10 @@
+name: SQLite
+type: sqlite
+driver: org.sqlite.JDBC
+url: "jdbc:sqlite:{database}"
+noForUpdate: true
+init:
+  - "PRAGMA journal_mode=WAL"
+  - "PRAGMA busy_timeout=5000"
+metrics:
+  - page_count: "PRAGMA page_count"

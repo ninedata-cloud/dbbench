@@ -1,7 +1,8 @@
 package com.ninedata.dbbench.database;
 
 import com.ninedata.dbbench.config.DatabaseConfig;
-import org.junit.jupiter.api.BeforeEach;
+import com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -10,13 +11,19 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("DatabaseAdapter Interface Tests")
 class DatabaseAdapterTest {
 
+    @BeforeAll
+    static void initRegistry() {
+        if (DatabaseDefinitionRegistry.getInstance() == null) {
+            new DatabaseDefinitionRegistry().init();
+        }
+    }
+
     @Test
     @DisplayName("MySQL adapter should support LIMIT syntax")
     void testMySQLSupportsLimit() {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("mysql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertTrue(adapter.supportsLimitSyntax());
         assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
@@ -27,7 +34,6 @@ class DatabaseAdapterTest {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("postgresql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertTrue(adapter.supportsLimitSyntax());
         assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
@@ -38,9 +44,7 @@ class DatabaseAdapterTest {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("oracle");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertFalse(adapter.supportsLimitSyntax());
-        // Oracle 11g compatibility requires ROWID
         assertTrue(adapter.requiresRowIdForLimitForUpdate());
     }
 
@@ -50,7 +54,6 @@ class DatabaseAdapterTest {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("db2");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertFalse(adapter.supportsLimitSyntax());
         assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
@@ -61,18 +64,16 @@ class DatabaseAdapterTest {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("sqlserver");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertFalse(adapter.supportsLimitSyntax());
         assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
-    @DisplayName("TiDB adapter should support LIMIT syntax (MySQL compatible)")
+    @DisplayName("TiDB adapter should support LIMIT syntax")
     void testTiDBSupportsLimit() {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("tidb");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertTrue(adapter.supportsLimitSyntax());
         assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
@@ -83,7 +84,6 @@ class DatabaseAdapterTest {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("oceanbase");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertTrue(adapter.supportsLimitSyntax());
         assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
@@ -94,7 +94,6 @@ class DatabaseAdapterTest {
         DatabaseConfig config = new DatabaseConfig();
         config.setType("dameng");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
-
         assertFalse(adapter.supportsLimitSyntax());
     }
 
@@ -105,25 +104,18 @@ class DatabaseAdapterTest {
 
         config.setType("mysql");
         assertEquals("MySQL", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("postgresql");
         assertEquals("PostgreSQL", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("oracle");
         assertEquals("Oracle", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("sqlserver");
         assertEquals("SQL Server", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("db2");
         assertEquals("DB2", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("dameng");
         assertEquals("Dameng", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("tidb");
         assertEquals("TiDB", DatabaseFactory.create(config).getDatabaseType());
-
         config.setType("oceanbase");
         assertEquals("OceanBase", DatabaseFactory.create(config).getDatabaseType());
     }
@@ -131,7 +123,6 @@ class DatabaseAdapterTest {
     @Test
     @DisplayName("Default collectHostMetrics interface method should return empty map")
     void testDefaultCollectHostMetrics() throws Exception {
-        // Test the default interface method directly using a mock adapter
         DatabaseAdapter mockAdapter = new DatabaseAdapter() {
             @Override public void initialize() {}
             @Override public java.sql.Connection getConnection() { return null; }
@@ -141,8 +132,6 @@ class DatabaseAdapterTest {
             @Override public java.util.Map<String, Object> collectMetrics() { return new java.util.HashMap<>(); }
             @Override public String getDatabaseType() { return "Mock"; }
         };
-
-        // Default implementation should return empty map
         assertTrue(mockAdapter.collectHostMetrics().isEmpty());
     }
 }

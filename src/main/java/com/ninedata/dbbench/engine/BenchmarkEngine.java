@@ -52,6 +52,10 @@ public class BenchmarkEngine {
     private volatile String loadMessage = "";
     private volatile TPCCLoader currentLoader = null;
 
+    // Cached hardware info (static, collected once)
+    private volatile Map<String, Object> cachedClientHardwareInfo = null;
+    private volatile Map<String, Object> cachedDbServerHardwareInfo = null;
+
     public BenchmarkEngine(DatabaseConfig dbConfig, BenchmarkConfig benchConfig,
                            MetricsRegistry metricsRegistry, ClientMetricsCollector clientMetricsCollector) {
         this.dbConfig = dbConfig;
@@ -167,6 +171,7 @@ public class BenchmarkEngine {
             sshCollector.disconnect();
             sshCollector = null;
         }
+        cachedDbServerHardwareInfo = null;
 
         addLog("INFO", "Configuration updated");
     }
@@ -202,6 +207,7 @@ public class BenchmarkEngine {
             sshCollector.disconnect();
             sshCollector = null;
         }
+        cachedDbServerHardwareInfo = null;
 
         if (dbConfig.getSsh().isEnabled()) {
             String host = dbConfig.getEffectiveSshHost();
@@ -655,6 +661,24 @@ public class BenchmarkEngine {
 
     public boolean isLoading() {
         return loading.get();
+    }
+
+    public Map<String, Object> getHardwareInfo() {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // Client hardware info - collect once and cache
+        if (cachedClientHardwareInfo == null) {
+            cachedClientHardwareInfo = clientMetricsCollector.collectHardwareInfo();
+        }
+        result.put("client", cachedClientHardwareInfo);
+
+        // DB server hardware info - from SSH if available
+        if (cachedDbServerHardwareInfo == null && sshCollector != null && sshCollector.isConnected()) {
+            cachedDbServerHardwareInfo = sshCollector.collectHardwareInfo();
+        }
+        result.put("dbServer", cachedDbServerHardwareInfo != null ? cachedDbServerHardwareInfo : new LinkedHashMap<>());
+
+        return result;
     }
 
     public Map<String, Object> getResults() {

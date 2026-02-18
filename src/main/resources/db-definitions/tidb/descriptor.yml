@@ -1,0 +1,49 @@
+name: TiDB
+type: tidb
+driver: com.mysql.cj.jdbc.Driver
+url: "jdbc:mysql://{host}:{port}/{database}"
+urlParams:
+  allowLoadLocalInfile: "true"
+  rewriteBatchedStatements: "true"
+init:
+  - "SET GLOBAL local_infile = ON"
+csvLoad: "LOAD DATA LOCAL INFILE '${filePath}' INTO TABLE ${tableName} FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"' LINES TERMINATED BY '\\n' (${columns})"
+metrics:
+  - sql: "SHOW GLOBAL STATUS LIKE 'Innodb%'"
+    map:
+      Innodb_buffer_pool_read_requests: buffer_pool_reads
+      Innodb_buffer_pool_reads: buffer_pool_read_misses
+      Innodb_row_lock_waits: row_lock_waits
+      Innodb_row_lock_time: row_lock_time_ms
+      Innodb_rows_read: rows_read
+      Innodb_rows_inserted: rows_inserted
+      Innodb_rows_updated: rows_updated
+      Innodb_rows_deleted: rows_deleted
+  - sql: "SHOW GLOBAL STATUS WHERE Variable_name IN ('Connections', 'Threads_connected', 'Threads_running', 'Queries', 'Slow_queries')"
+    map:
+      Connections: total_connections
+      Threads_connected: active_connections
+      Threads_running: running_threads
+      Queries: total_queries
+      Slow_queries: slow_queries
+  - sql: "SELECT TYPE, COUNT(*) as cnt FROM INFORMATION_SCHEMA.CLUSTER_INFO GROUP BY TYPE"
+    map: {}
+  - sql: >
+      SELECT COUNT(*) as tikv_store_count,
+      SUM(AVAILABLE_SIZE) as tikv_available_bytes,
+      SUM(CAPACITY) as tikv_capacity_bytes
+      FROM INFORMATION_SCHEMA.TIKV_STORE_STATUS
+  - buffer_pool_hit_ratio: "((buffer_pool_reads - buffer_pool_read_misses) / buffer_pool_reads) * 100"
+    computed: true
+hostMetrics:
+  - sql: "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_data_read', 'Innodb_data_written', 'Bytes_received', 'Bytes_sent')"
+    map:
+      Innodb_data_read: diskReadBytes
+      Innodb_data_written: diskWriteBytes
+      Bytes_received: networkRecvBytes
+      Bytes_sent: networkSentBytes
+  - sql: >
+      SELECT COUNT(*) as tikv_region_count,
+      SUM(APPROXIMATE_SIZE) as tikv_total_size_mb,
+      SUM(APPROXIMATE_KEYS) as tikv_total_keys
+      FROM INFORMATION_SCHEMA.TIKV_REGION_STATUS

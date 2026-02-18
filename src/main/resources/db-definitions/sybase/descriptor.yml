@@ -1,0 +1,23 @@
+name: Sybase
+type: sybase
+aliases:
+  - ase
+driver: com.sybase.jdbc4.jdbc.SybDriver
+url: "jdbc:sybase:Tds:{host}:{port}/{database}"
+noLimit: true
+dropStatement: "IF EXISTS (SELECT 1 FROM sysobjects WHERE name='${tableName}') DROP TABLE ${tableName}"
+metrics:
+  - active_connections: "SELECT COUNT(*) FROM master..sysprocesses WHERE status = 'runnable'"
+  - total_connections: "SELECT COUNT(*) FROM master..sysprocesses"
+  - buffer_pool_hit_ratio: >
+      SELECT (1.0 - CONVERT(FLOAT, phys.value) / NULLIF(logi.value, 0)) * 100
+      FROM master..sysmonitors phys, master..sysmonitors logi
+      WHERE phys.field_name = 'bufs_pread' AND logi.field_name = 'bufs_lread'
+  - lock_waits: "SELECT COUNT(*) FROM master..syslocks WHERE type > 0"
+hostMetrics:
+  - sql: "SELECT field_name, value FROM master..sysmonitors WHERE field_name IN ('cpu_busy', 'io_busy', 'cpu_idle')"
+    map:
+      cpu_busy: cpu_busy
+      cpu_idle: cpu_idle
+  - cpuUsage: "(cpu_busy / (cpu_busy + cpu_idle)) * 100"
+    computed: true

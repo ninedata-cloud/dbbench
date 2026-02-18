@@ -2,6 +2,7 @@ package com.ninedata.dbbench.web;
 
 import com.ninedata.dbbench.config.BenchmarkConfig;
 import com.ninedata.dbbench.config.DatabaseConfig;
+import com.ninedata.dbbench.config.ProfileService;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
 import com.ninedata.dbbench.metrics.ClientMetricsCollector;
@@ -29,7 +30,9 @@ class BenchmarkControllerTest {
         MetricsRegistry metricsRegistry = new MetricsRegistry();
         ClientMetricsCollector clientMetricsCollector = new ClientMetricsCollector();
         engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
-        controller = new BenchmarkController(engine, dbConfig);
+        ProfileService profileService = new ProfileService();
+        profileService.init();
+        controller = new BenchmarkController(engine, dbConfig, profileService);
     }
 
     @Test

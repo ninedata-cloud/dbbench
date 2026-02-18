@@ -40,16 +40,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadInitialState() {
     try {
-        // Load config, status, metrics, and logs in parallel
-        const [configRes, metricsRes, logsRes] = await Promise.all([
+        // Load config, status, metrics, logs, and database types in parallel
+        const [configRes, metricsRes, logsRes, dbTypesRes] = await Promise.all([
             fetch('/api/benchmark/config'),
             fetch('/api/metrics/current'),
-            fetch('/api/benchmark/logs?limit=100')
+            fetch('/api/benchmark/logs?limit=100'),
+            fetch('/api/benchmark/database-types')
         ]);
 
         const config = await configRes.json();
         const metrics = await metricsRes.json();
         const logs = await logsRes.json();
+        const dbTypes = await dbTypesRes.json();
+
+        // Populate database type dropdown and merge URL templates
+        populateDatabaseTypes(dbTypes);
 
         // Apply config
         currentConfig = config;
@@ -77,6 +82,9 @@ async function loadInitialState() {
         const logEl = document.getElementById('log');
         logEl.innerHTML = '';
         logs.slice(-50).forEach(log => appendLogEntry(log));
+
+        // Load hardware info
+        loadHardwareInfo();
 
         addLog('Dashboard initialized', 'success');
     } catch (e) {
@@ -846,6 +854,9 @@ function openConfigModal() {
         return;
     }
 
+    // Load profiles list
+    loadProfiles();
+
     // Populate form with current config
     const cfg = currentConfig;
 
@@ -963,6 +974,19 @@ async function saveConfig() {
         if (data.success) {
             currentConfig = data.config;
             displayConfig(currentConfig);
+
+            // Save to current profile
+            const profileName = document.getElementById('profileSelect').value;
+            if (profileName && profileName !== 'default') {
+                try {
+                    await fetch(`/api/benchmark/profiles/${encodeURIComponent(profileName)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newConfig)
+                    });
+                } catch (ignored) {}
+            }
+
             closeModal('configModal');
             addLog('Configuration saved successfully', 'success');
             showToast('success', 'Configuration Saved', 'Benchmark configuration has been updated');
@@ -1126,7 +1150,39 @@ async function apiCall(endpoint, method = 'POST', body = null) {
     }
 }
 
-async function loadData() {
+// ==================== Confirm Dialog ====================
+
+let confirmCallback = null;
+
+function showConfirmDialog(title, message, btnClass, onConfirm) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    const btn = document.getElementById('confirmBtn');
+    btn.className = 'btn ' + btnClass;
+    btn.textContent = 'Confirm';
+    confirmCallback = onConfirm;
+    openModal('confirmModal');
+}
+
+function closeConfirmModal() {
+    closeModal('confirmModal');
+    confirmCallback = null;
+}
+
+function executeConfirm() {
+    if (confirmCallback) {
+        confirmCallback();
+    }
+    closeConfirmModal();
+}
+
+// ==================== Operations ====================
+
+function loadData() {
+    showConfirmDialog('Load Data', 'Are you sure you want to load TPC-C test data?', 'btn-warning', doLoadData);
+}
+
+async function doLoadData() {
     addLog('Starting data load... this may take several minutes', 'info');
     showToast('info', 'Data Loading', 'Starting data load, this may take several minutes');
     document.getElementById('loadProgressContainer').classList.add('active');
@@ -1135,11 +1191,11 @@ async function loadData() {
     await apiCall('load');
 }
 
-async function cancelLoad() {
-    if (!confirm('Are you sure you want to cancel data loading? Partial data may remain in the database.')) {
-        return;
-    }
+function cancelLoad() {
+    showConfirmDialog('Cancel Loading', 'Are you sure you want to cancel data loading? Partial data may remain in the database.', 'btn-danger', doCancelLoad);
+}
 
+async function doCancelLoad() {
     addLog('Cancelling data load...', 'warn');
     document.getElementById('btnCancelLoad').disabled = true;
     const result = await apiCall('load/cancel');
@@ -1148,11 +1204,11 @@ async function cancelLoad() {
     }
 }
 
-async function cleanData() {
-    if (!confirm('Are you sure you want to clean all test data? This will drop all TPC-C tables.')) {
-        return;
-    }
+function cleanData() {
+    showConfirmDialog('Clean Data', 'Are you sure you want to clean all test data? This will drop all TPC-C tables.', 'btn-danger', doCleanData);
+}
 
+async function doCleanData() {
     addLog('Cleaning test data...', 'info');
     const result = await apiCall('clean');
     if (result.success) {
@@ -1160,7 +1216,11 @@ async function cleanData() {
     }
 }
 
-async function startBenchmark() {
+function startBenchmark() {
+    showConfirmDialog('Start Benchmark', 'Are you sure you want to start the benchmark?', 'btn-primary', doStartBenchmark);
+}
+
+async function doStartBenchmark() {
     // Clear TPS chart data for new run (keep CPU/Network for continuous monitoring)
     tpsChart.data.labels = [];
     tpsChart.data.datasets[0].data = [];
@@ -1205,7 +1265,11 @@ async function startBenchmark() {
     }
 }
 
-async function stopBenchmark() {
+function stopBenchmark() {
+    showConfirmDialog('Stop Benchmark', 'Are you sure you want to stop the running benchmark?', 'btn-danger', doStopBenchmark);
+}
+
+async function doStopBenchmark() {
     addLog('Stopping benchmark...', 'info');
     const result = await apiCall('stop');
     if (result.success) {
@@ -1350,6 +1414,21 @@ function onDbTypeChange() {
     document.getElementById('connectionTestResult').innerHTML = '';
 }
 
+function populateDatabaseTypes(types) {
+    const select = document.getElementById('cfgFormDbType');
+    select.innerHTML = '';
+    types.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.value;
+        option.textContent = t.builtin ? t.label : t.label + ' (plugin)';
+        select.appendChild(option);
+        // Merge plugin URL templates into the global map
+        if (!t.builtin && t.urlTemplate) {
+            jdbcUrlTemplates[t.value] = t.urlTemplate;
+        }
+    });
+}
+
 function applySqliteConstraints(dbType) {
     const terminalsInput = document.getElementById('cfgFormTerminals');
     const loadConcurrencyInput = document.getElementById('cfgFormLoadConcurrency');
@@ -1479,6 +1558,52 @@ async function testConnection() {
     }
 }
 
+// ==================== Hardware Info ====================
+
+async function loadHardwareInfo() {
+    try {
+        const res = await fetch('/api/metrics/hardware-info');
+        const data = await res.json();
+
+        if (data.client && Object.keys(data.client).length > 0) {
+            displayHardwareInfo('client', data.client);
+        }
+        if (data.dbServer && Object.keys(data.dbServer).length > 0) {
+            displayHardwareInfo('db', data.dbServer);
+        }
+    } catch (e) {
+        console.error('Failed to load hardware info:', e);
+    }
+}
+
+function displayHardwareInfo(prefix, hw) {
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val || '-';
+    };
+
+    setVal(prefix + 'HwOs', hw.os);
+    setVal(prefix + 'HwCpu', hw.cpu);
+
+    let cores = '';
+    if (hw.cpuPhysicalCores) cores += hw.cpuPhysicalCores + 'P';
+    if (hw.cpuLogicalCores) cores += (cores ? '/' : '') + hw.cpuLogicalCores + 'L';
+    if (hw.cpuFreqMHz && hw.cpuFreqMHz > 0) cores += ' @ ' + hw.cpuFreqMHz + ' MHz';
+    setVal(prefix + 'HwCores', cores || '-');
+
+    setVal(prefix + 'HwMemory', hw.memoryTotalGB ? hw.memoryTotalGB + ' GB' : '-');
+    setVal(prefix + 'HwDisk', hw.disks);
+    setVal(prefix + 'HwNetwork', hw.network);
+}
+
+function toggleHwInfo(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    const grid = section.querySelector('.hw-info-grid');
+    const isExpanded = section.classList.toggle('expanded');
+    if (grid) grid.style.display = isExpanded ? 'grid' : 'none';
+}
+
 // ==================== Status Change Detection ====================
 
 function handleStatusChange(oldStatus, newStatus) {
@@ -1496,4 +1621,173 @@ function handleStatusChange(oldStatus, newStatus) {
     } else if (newStatus === 'ERROR') {
         showToast('error', 'Error', 'An error occurred, check logs for details');
     }
+
+    // Re-fetch hardware info when initialized (SSH may have just connected)
+    if (newStatus === 'INITIALIZED') {
+        loadHardwareInfo();
+    }
+}
+
+// ==================== Profile Management ====================
+
+async function loadProfiles() {
+    try {
+        const res = await fetch('/api/benchmark/profiles');
+        const profiles = await res.json();
+        const select = document.getElementById('profileSelect');
+        const currentVal = select.value || 'default';
+        select.innerHTML = '<option value="default">default</option>';
+        profiles.forEach(name => {
+            if (name === 'default') return;
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
+        if (profiles.includes(currentVal)) {
+            select.value = currentVal;
+        } else {
+            select.value = 'default';
+        }
+    } catch (e) {
+        console.error('Failed to load profiles:', e);
+    }
+}
+
+async function onProfileChange() {
+    const select = document.getElementById('profileSelect');
+    const name = select.value;
+    if (!name || name === 'default') return;
+    try {
+        const res = await fetch(`/api/benchmark/profiles/${encodeURIComponent(name)}`);
+        const data = await res.json();
+        if (data.success && data.config) {
+            fillConfigForm(data.config);
+        }
+    } catch (e) {
+        console.error('Failed to load profile:', e);
+    }
+}
+
+function fillConfigForm(cfg) {
+    if (cfg.database) {
+        document.getElementById('cfgFormDbType').value = cfg.database.type || 'mysql';
+        document.getElementById('cfgFormJdbcUrl').value = cfg.database.jdbcUrl || '';
+        document.getElementById('cfgFormDbUser').value = cfg.database.username || '';
+        document.getElementById('cfgFormDbPass').value = cfg.database.password || '';
+        document.getElementById('cfgFormPoolSize').value = cfg.database.poolSize || 50;
+    }
+    if (cfg.benchmark) {
+        document.getElementById('cfgFormWarehouses').value = cfg.benchmark.warehouses || 10;
+        document.getElementById('cfgFormTerminals').value = cfg.benchmark.terminals || 50;
+        document.getElementById('cfgFormDuration').value = cfg.benchmark.duration || 60;
+        document.getElementById('cfgFormLoadConcurrency').value = cfg.benchmark.loadConcurrency || 4;
+        document.getElementById('cfgFormThinkTime').checked = cfg.benchmark.thinkTime || false;
+        document.getElementById('cfgFormLoadMode').value = cfg.benchmark.loadMode || 'auto';
+    }
+    if (cfg.transactionMix) {
+        document.getElementById('cfgFormMixNewOrder').value = cfg.transactionMix.newOrder || 45;
+        document.getElementById('cfgFormMixPayment').value = cfg.transactionMix.payment || 43;
+        document.getElementById('cfgFormMixOrderStatus').value = cfg.transactionMix.orderStatus || 4;
+        document.getElementById('cfgFormMixDelivery').value = cfg.transactionMix.delivery || 4;
+        document.getElementById('cfgFormMixStockLevel').value = cfg.transactionMix.stockLevel || 4;
+    }
+    if (cfg.ssh) {
+        document.getElementById('cfgFormSshEnabled').checked = cfg.ssh.enabled || false;
+        document.getElementById('cfgFormSshHost').value = cfg.ssh.host || '';
+        document.getElementById('cfgFormSshPort').value = cfg.ssh.port || 22;
+        document.getElementById('cfgFormSshUser').value = cfg.ssh.username || 'root';
+        document.getElementById('cfgFormSshPass').value = cfg.ssh.password || '';
+        document.getElementById('cfgFormSshKey').value = cfg.ssh.privateKey || '';
+        toggleSshFields();
+    }
+    applySqliteConstraints(document.getElementById('cfgFormDbType').value);
+}
+
+async function saveProfile() {
+    const name = prompt('Enter profile name (e.g. mysql-local, pg-prod):');
+    if (!name || !name.trim()) return;
+
+    const config = buildConfigFromForm();
+    try {
+        const res = await fetch(`/api/benchmark/profiles/${encodeURIComponent(name.trim())}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('success', 'Profile Saved', data.message);
+            addLog('Profile saved: ' + name.trim(), 'success');
+            await loadProfiles();
+            document.getElementById('profileSelect').value = name.trim();
+        } else {
+            showToast('error', 'Save Failed', data.error);
+        }
+    } catch (e) {
+        showToast('error', 'Save Failed', e.message);
+    }
+}
+
+async function deleteProfile() {
+    const select = document.getElementById('profileSelect');
+    const name = select.value;
+    if (!name) {
+        showToast('warning', 'No Profile', 'Please select a profile first');
+        return;
+    }
+    if (!confirm(`Delete profile "${name}"?`)) return;
+
+    try {
+        const res = await fetch(`/api/benchmark/profiles/${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('success', 'Profile Deleted', data.message);
+            addLog('Profile deleted: ' + name, 'info');
+            await loadProfiles();
+        } else {
+            showToast('error', 'Delete Failed', data.error);
+        }
+    } catch (e) {
+        showToast('error', 'Delete Failed', e.message);
+    }
+}
+
+function buildConfigFromForm() {
+    const dbType = document.getElementById('cfgFormDbType').value;
+    const isSqlite = dbType === 'sqlite';
+    return {
+        database: {
+            type: dbType,
+            jdbcUrl: document.getElementById('cfgFormJdbcUrl').value,
+            username: document.getElementById('cfgFormDbUser').value,
+            password: document.getElementById('cfgFormDbPass').value,
+            poolSize: parseInt(document.getElementById('cfgFormPoolSize').value)
+        },
+        ssh: {
+            enabled: document.getElementById('cfgFormSshEnabled').checked,
+            host: document.getElementById('cfgFormSshHost').value,
+            port: parseInt(document.getElementById('cfgFormSshPort').value) || 22,
+            username: document.getElementById('cfgFormSshUser').value,
+            password: document.getElementById('cfgFormSshPass').value,
+            privateKey: document.getElementById('cfgFormSshKey').value
+        },
+        benchmark: {
+            warehouses: parseInt(document.getElementById('cfgFormWarehouses').value),
+            terminals: isSqlite ? 1 : parseInt(document.getElementById('cfgFormTerminals').value),
+            duration: parseInt(document.getElementById('cfgFormDuration').value),
+            loadConcurrency: isSqlite ? 1 : parseInt(document.getElementById('cfgFormLoadConcurrency').value),
+            thinkTime: document.getElementById('cfgFormThinkTime').checked,
+            loadMode: document.getElementById('cfgFormLoadMode').value
+        },
+        transactionMix: {
+            newOrder: parseInt(document.getElementById('cfgFormMixNewOrder').value),
+            payment: parseInt(document.getElementById('cfgFormMixPayment').value),
+            orderStatus: parseInt(document.getElementById('cfgFormMixOrderStatus').value),
+            delivery: parseInt(document.getElementById('cfgFormMixDelivery').value),
+            stockLevel: parseInt(document.getElementById('cfgFormMixStockLevel').value)
+        }
+    };
 }

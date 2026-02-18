@@ -1,0 +1,56 @@
+name: OceanBase
+type: oceanbase
+driver: com.oceanbase.jdbc.Driver
+url: "jdbc:oceanbase://{host}:{port}/{database}"
+urlParams:
+  allowLoadLocalInfile: "true"
+  rewriteBatchedStatements: "true"
+init:
+  - "SET GLOBAL local_infile = ON"
+csvLoad: "LOAD DATA LOCAL INFILE '${filePath}' INTO TABLE ${tableName} FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"' LINES TERMINATED BY '\\n' (${columns})"
+metrics:
+  - sql: "SHOW GLOBAL STATUS LIKE 'Innodb%'"
+    map:
+      Innodb_buffer_pool_read_requests: buffer_pool_reads
+      Innodb_buffer_pool_reads: buffer_pool_read_misses
+      Innodb_row_lock_waits: row_lock_waits
+      Innodb_rows_read: rows_read
+      Innodb_rows_inserted: rows_inserted
+      Innodb_rows_updated: rows_updated
+      Innodb_rows_deleted: rows_deleted
+  - sql: "SHOW GLOBAL STATUS WHERE Variable_name IN ('Connections', 'Threads_connected', 'Threads_running', 'Queries', 'Slow_queries')"
+    map:
+      Connections: total_connections
+      Threads_connected: active_connections
+      Threads_running: running_threads
+      Queries: total_queries
+      Slow_queries: slow_queries
+  - sql: >
+      SELECT SUM(ACTIVE_SPAN) as memstore_active_bytes,
+      SUM(FREEZE_TRIGGER) as freeze_trigger,
+      SUM(MEMSTORE_LIMIT) as memstore_limit_bytes
+      FROM GV$OB_MEMSTORE
+  - sql: >
+      SELECT COUNT(*) as ob_request_count_10s,
+      AVG(ELAPSED_TIME) as ob_avg_rt_us,
+      MAX(ELAPSED_TIME) as ob_max_rt_us
+      FROM GV$OB_SQL_AUDIT
+      WHERE REQUEST_TIME > (UNIX_TIMESTAMP() - 10) * 1000000
+  - buffer_pool_hit_ratio: "((buffer_pool_reads - buffer_pool_read_misses) / buffer_pool_reads) * 100"
+    computed: true
+hostMetrics:
+  - sql: "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_data_read', 'Innodb_data_written', 'Bytes_received', 'Bytes_sent')"
+    map:
+      Innodb_data_read: diskReadBytes
+      Innodb_data_written: diskWriteBytes
+      Bytes_received: networkRecvBytes
+      Bytes_sent: networkSentBytes
+  - sql: >
+      SELECT SVR_IP, CPU_CAPACITY, CPU_ASSIGNED,
+      MEM_CAPACITY, MEM_ASSIGNED
+      FROM GV$OB_SERVERS
+    map:
+      CPU_CAPACITY: ob_cpu_capacity
+      CPU_ASSIGNED: ob_cpu_assigned
+      MEM_CAPACITY: ob_mem_capacity_bytes
+      MEM_ASSIGNED: ob_mem_assigned_bytes

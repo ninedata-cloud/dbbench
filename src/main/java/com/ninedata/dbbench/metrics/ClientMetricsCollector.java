@@ -116,6 +116,56 @@ public class ClientMetricsCollector {
         }
     }
 
+    public Map<String, Object> collectHardwareInfo() {
+        Map<String, Object> hw = new LinkedHashMap<>();
+        try {
+            // OS
+            hw.put("os", os.getFamily() + " " + os.getVersionInfo().getVersion() + " (" + System.getProperty("os.arch") + ")");
+
+            // CPU
+            CentralProcessor.ProcessorIdentifier cpuId = processor.getProcessorIdentifier();
+            hw.put("cpu", cpuId.getName().trim());
+            hw.put("cpuPhysicalCores", processor.getPhysicalProcessorCount());
+            hw.put("cpuLogicalCores", processor.getLogicalProcessorCount());
+            long maxFreq = processor.getMaxFreq();
+            hw.put("cpuFreqMHz", maxFreq > 0 ? maxFreq / 1_000_000 : 0);
+
+            // Memory
+            hw.put("memoryTotalGB", String.format("%.1f", memory.getTotal() / (1024.0 * 1024 * 1024)));
+
+            // Disks
+            List<String> disks = new ArrayList<>();
+            for (HWDiskStore disk : systemInfo.getHardware().getDiskStores()) {
+                String model = disk.getModel() != null ? disk.getModel().trim() : "Unknown";
+                long sizeGB = disk.getSize() / (1024L * 1024 * 1024);
+                if (sizeGB > 0) {
+                    disks.add(model + " (" + sizeGB + " GB)");
+                }
+            }
+            hw.put("disks", disks.isEmpty() ? "-" : String.join(", ", disks));
+
+            // Network interfaces
+            List<String> nets = new ArrayList<>();
+            for (NetworkIF net : systemInfo.getHardware().getNetworkIFs()) {
+                if (validNetworkInterfaces.contains(net.getName())) {
+                    long speed = net.getSpeed();
+                    String speedStr = speed > 0 ? formatNetSpeed(speed) : "?";
+                    nets.add(net.getName() + " (" + speedStr + ")");
+                }
+            }
+            hw.put("network", nets.isEmpty() ? "-" : String.join(", ", nets));
+        } catch (Exception e) {
+            log.warn("Error collecting hardware info: {}", e.getMessage());
+        }
+        return hw;
+    }
+
+    private String formatNetSpeed(long bps) {
+        if (bps >= 1_000_000_000L) return String.format("%.0f Gbps", bps / 1_000_000_000.0);
+        if (bps >= 1_000_000L) return String.format("%.0f Mbps", bps / 1_000_000.0);
+        return String.format("%.0f Kbps", bps / 1_000.0);
+    }
+
     public Map<String, Object> collect() {
         Map<String, Object> metrics = new LinkedHashMap<>();
         long currentTime = System.currentTimeMillis();

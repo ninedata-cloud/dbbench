@@ -1,8 +1,10 @@
 package com.ninedata.dbbench.web;
 
 import com.ninedata.dbbench.config.DatabaseConfig;
+import com.ninedata.dbbench.config.ProfileService;
 import com.ninedata.dbbench.database.DatabaseAdapter;
 import com.ninedata.dbbench.database.DatabaseFactory;
+import com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.SshMetricsCollector;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Connection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -21,6 +24,7 @@ import java.util.Map;
 public class BenchmarkController {
     private final BenchmarkEngine engine;
     private final DatabaseConfig dbConfig;
+    private final ProfileService profileService;
 
     @PostMapping("/init")
     public ResponseEntity<Map<String, Object>> initialize() {
@@ -326,6 +330,11 @@ public class BenchmarkController {
         }
     }
 
+    @GetMapping("/database-types")
+    public ResponseEntity<List<Map<String, Object>>> databaseTypes() {
+        return ResponseEntity.ok(DatabaseFactory.getAvailableTypes());
+    }
+
     /**
      * Get database-specific validation query
      * Different databases require different syntax for simple validation queries
@@ -334,11 +343,14 @@ public class BenchmarkController {
         if (dbType == null) {
             return "SELECT 1";
         }
-        return switch (dbType.toLowerCase()) {
-            case "oracle", "dameng" -> "SELECT 1 FROM DUAL";
-            case "db2" -> "SELECT 1 FROM SYSIBM.SYSDUMMY1";
-            default -> "SELECT 1"; // MySQL, PostgreSQL, SQL Server, TiDB, OceanBase
-        };
+        DatabaseDefinitionRegistry registry = DatabaseDefinitionRegistry.getInstance();
+        if (registry != null) {
+            var def = registry.getDefinition(dbType);
+            if (def != null && def.getValidationQuery() != null) {
+                return def.getValidationQuery();
+            }
+        }
+        return "SELECT 1";
     }
 
     @GetMapping("/logs")
@@ -355,5 +367,79 @@ public class BenchmarkController {
         response.put("success", true);
         response.put("message", "Logs cleared");
         return ResponseEntity.ok(response);
+    }
+
+    // ==================== Profile Management ====================
+
+    @GetMapping("/profiles")
+    public ResponseEntity<List<String>> listProfiles() {
+        return ResponseEntity.ok(profileService.listProfiles());
+    }
+
+    @GetMapping("/profiles/{name}")
+    public ResponseEntity<Map<String, Object>> loadProfile(@PathVariable String name) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        try {
+            Map<String, Object> config = profileService.loadProfile(name);
+            response.put("success", true);
+            response.put("config", config);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to load profile: {}", name, e);
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/profiles/{name}")
+    public ResponseEntity<Map<String, Object>> saveProfile(@PathVariable String name, @RequestBody Map<String, Object> config) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        try {
+            profileService.saveProfile(name, config);
+            response.put("success", true);
+            response.put("message", "Profile saved: " + name);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to save profile: {}", name, e);
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @DeleteMapping("/profiles/{name}")
+    public ResponseEntity<Map<String, Object>> deleteProfile(@PathVariable String name) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        try {
+            profileService.deleteProfile(name);
+            response.put("success", true);
+            response.put("message", "Profile deleted: " + name);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to delete profile: {}", name, e);
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/profiles/{name}/apply")
+    public ResponseEntity<Map<String, Object>> applyProfile(@PathVariable String name) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        try {
+            Map<String, Object> config = profileService.loadProfile(name);
+            engine.updateConfig(config);
+            response.put("success", true);
+            response.put("message", "Profile applied: " + name);
+            response.put("config", engine.getConfig());
+            response.put("status", engine.getStatus());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to apply profile: {}", name, e);
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
     }
 }

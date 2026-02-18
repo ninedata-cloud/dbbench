@@ -1,25 +1,43 @@
 package com.ninedata.dbbench.database;
 
 import com.ninedata.dbbench.config.DatabaseConfig;
+import com.ninedata.dbbench.database.plugin.DatabaseDefinition;
+import com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry;
+import com.ninedata.dbbench.database.plugin.ScriptBasedAdapter;
+
+import java.util.*;
 
 public class DatabaseFactory {
 
     public static DatabaseAdapter create(DatabaseConfig config) {
-        return switch (config.getType().toLowerCase()) {
-            case "mysql" -> new MySQLAdapter(config);
-            case "postgresql", "postgres" -> new PostgreSQLAdapter(config);
-            case "oracle" -> new OracleAdapter(config);
-            case "sqlserver", "mssql" -> new SQLServerAdapter(config);
-            case "db2" -> new DB2Adapter(config);
-            case "dameng", "dm" -> new DamengAdapter(config);
-            case "oceanbase" -> new OceanBaseAdapter(config);
-            case "tidb" -> new TiDBAdapter(config);
-            case "sqlite" -> new SQLiteAdapter(config);
-            case "yashandb", "yashan" -> new YashanDBAdapter(config);
-            case "gbase8s", "gbase" -> new GBase8sAdapter(config);
-            case "sybase", "ase" -> new SybaseAdapter(config);
-            case "hana", "saphana" -> new HANAAdapter(config);
-            default -> throw new IllegalArgumentException("Unsupported database type: " + config.getType());
-        };
+        DatabaseDefinitionRegistry registry = DatabaseDefinitionRegistry.getInstance();
+        if (registry != null) {
+            DatabaseDefinition def = registry.getDefinition(config.getType());
+            if (def != null) {
+                return new ScriptBasedAdapter(config, def);
+            }
+        }
+        throw new IllegalArgumentException("Unsupported database type: " + config.getType()
+                + ". No plugin found. Available plugins are loaded from db-definitions/.");
+    }
+
+    public static List<Map<String, Object>> getAvailableTypes() {
+        List<Map<String, Object>> types = new ArrayList<>();
+        DatabaseDefinitionRegistry registry = DatabaseDefinitionRegistry.getInstance();
+        if (registry != null) {
+            for (DatabaseDefinition def : registry.getAllDefinitions()) {
+                String type = def.getType().toLowerCase();
+                if (type.startsWith("_")) continue;
+                Map<String, Object> t = new LinkedHashMap<>();
+                t.put("value", type);
+                t.put("label", def.getName());
+                t.put("builtin", true);
+                if (def.getUrlTemplate() != null) {
+                    t.put("urlTemplate", def.getUrlTemplate());
+                }
+                types.add(t);
+            }
+        }
+        return types;
     }
 }
