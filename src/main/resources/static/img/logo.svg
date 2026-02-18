@@ -1,31 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Database cylinder -->
-  <ellipse cx="22" cy="16" rx="14" ry="5" fill="#00d9ff" opacity="0.9"/>
-  <rect x="8" y="16" width="28" height="28" fill="#0a1628"/>
-  <ellipse cx="22" cy="16" rx="14" ry="5" fill="none" stroke="#00d9ff" stroke-width="2"/>
-  <ellipse cx="22" cy="26" rx="14" ry="5" fill="none" stroke="#00d9ff" stroke-width="2" opacity="0.7"/>
-  <ellipse cx="22" cy="36" rx="14" ry="5" fill="none" stroke="#00d9ff" stroke-width="2" opacity="0.5"/>
-  <ellipse cx="22" cy="44" rx="14" ry="5" fill="none" stroke="#00d9ff" stroke-width="2"/>
-  <line x1="8" y1="16" x2="8" y2="44" stroke="#00d9ff" stroke-width="2"/>
-  <line x1="36" y1="16" x2="36" y2="44" stroke="#00d9ff" stroke-width="2"/>
+  <defs>
+    <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00d9ff"/>
+      <stop offset="100%" stop-color="#0088cc"/>
+    </linearGradient>
+    <linearGradient id="boltGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#ff8c00"/>
+    </linearGradient>
+  </defs>
 
-  <!-- Performance chart / speedometer -->
-  <path d="M 44 52 A 16 16 0 0 1 44 24" fill="none" stroke="#00ff88" stroke-width="3" stroke-linecap="round"/>
-  <path d="M 44 24 A 16 16 0 0 1 56 38" fill="none" stroke="#ffa500" stroke-width="3" stroke-linecap="round"/>
-  <path d="M 56 38 A 16 16 0 0 1 52 48" fill="none" stroke="#ff4757" stroke-width="3" stroke-linecap="round"/>
+  <!-- Database cylinder body -->
+  <path d="M2,14 L2,50 Q2,60 32,60 Q62,60 62,50 L62,14" fill="#0a1628" stroke="url(#dbGrad)" stroke-width="2.5"/>
 
-  <!-- Speedometer needle -->
-  <line x1="48" y1="40" x2="54" y2="32" stroke="#00d9ff" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="48" cy="40" r="3" fill="#00d9ff"/>
+  <!-- Database top ellipse -->
+  <ellipse cx="32" cy="14" rx="30" ry="10" fill="#0a1628"/>
+  <ellipse cx="32" cy="14" rx="30" ry="10" fill="url(#dbGrad)" opacity="0.25"/>
+  <ellipse cx="32" cy="14" rx="30" ry="10" fill="none" stroke="url(#dbGrad)" stroke-width="2.5"/>
+
+  <!-- Database middle rings -->
+  <ellipse cx="32" cy="28" rx="30" ry="9" fill="none" stroke="#00d9ff" stroke-width="1.4" opacity="0.35"/>
+  <ellipse cx="32" cy="42" rx="30" ry="9" fill="none" stroke="#00d9ff" stroke-width="1.4" opacity="0.25"/>
+
+  <!-- Lightning bolt -->
+  <polygon points="38,4 24,32 33,32 26,62 46,26 36,26" fill="url(#boltGrad)" opacity="0.95"/>
+  <polygon points="38,4 24,32 33,32 26,62 46,26 36,26" fill="none" stroke="#fff" stroke-width="0.6" opacity="0.35"/>
 
   <!-- Data flow dots -->
-  <circle cx="22" cy="21" r="1.5" fill="#00ff88">
-    <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+  <circle cx="12" cy="24" r="2.2" fill="#00ff88" opacity="0.9">
+    <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.2s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="22" cy="31" r="1.5" fill="#00ff88">
-    <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
+  <circle cx="12" cy="35" r="2.2" fill="#00ff88" opacity="0.6">
+    <animate attributeName="opacity" values="0.3;0.9;0.3" dur="1.2s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="22" cy="40" r="1.5" fill="#00ff88">
-    <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite" begin="0.5s"/>
+  <circle cx="12" cy="46" r="2.2" fill="#00ff88" opacity="0.3">
+    <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.2s" repeatCount="indefinite" begin="0.4s"/>
   </circle>
 </svg>
