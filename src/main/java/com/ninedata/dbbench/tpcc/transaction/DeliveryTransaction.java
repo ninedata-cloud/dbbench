@@ -25,32 +25,41 @@ public class DeliveryTransaction extends AbstractTransaction {
         int delivered = 0;
 
         for (int d = 1; d <= TPCCUtil.DISTRICTS_PER_WAREHOUSE; d++) {
-            // Get oldest undelivered order
-            int orderId;
-            String sql = buildSelectFirstRowForUpdateQuery(
-                "SELECT no_o_id FROM new_order WHERE no_w_id = ? AND no_d_id = ? ORDER BY no_o_id");
-            PreparedStatement ps = ctx.prepareStatement(sql);
-            ps.setInt(1, warehouseId);
-            ps.setInt(2, d);
-            ResultSet rs = ps.executeQuery();
-            if (!rs.next()) { rs.close(); continue; }
-            orderId = rs.getInt(1);
-            rs.close();
+            // Find oldest undelivered order using optimistic concurrency (BenchmarkSQL approach):
+            // SELECT without FOR UPDATE / LIMIT, then attempt DELETE.
+            // If DELETE returns 0 (concurrent delivery took it), retry next row.
+            int orderId = -1;
+            PreparedStatement selectPs = ctx.prepareStatement(
+                "SELECT no_o_id FROM new_order WHERE no_w_id = ? AND no_d_id = ? ORDER BY no_o_id ASC");
+            PreparedStatement deletePs = ctx.prepareStatement(
+                "DELETE FROM new_order WHERE no_w_id = ? AND no_d_id = ? AND no_o_id = ?");
 
-            // Delete from new_order
-            ps = ctx.prepareStatement("DELETE FROM new_order WHERE no_w_id = ? AND no_d_id = ? AND no_o_id = ?");
-            ps.setInt(1, warehouseId);
-            ps.setInt(2, d);
-            ps.setInt(3, orderId);
-            ps.executeUpdate();
+            while (orderId < 0) {
+                selectPs.setInt(1, warehouseId);
+                selectPs.setInt(2, d);
+                ResultSet rs = selectPs.executeQuery();
+                if (!rs.next()) { rs.close(); break; }
+                orderId = rs.getInt(1);
+                rs.close();
+
+                deletePs.setInt(1, warehouseId);
+                deletePs.setInt(2, d);
+                deletePs.setInt(3, orderId);
+                if (deletePs.executeUpdate() == 0) {
+                    // Another concurrent DELIVERY already processed this order, retry
+                    orderId = -1;
+                }
+            }
+
+            if (orderId < 0) continue;
 
             // Get customer ID
             int customerId;
-            ps = ctx.prepareStatement("SELECT o_c_id FROM oorder WHERE o_w_id = ? AND o_d_id = ? AND o_id = ?");
+            PreparedStatement ps = ctx.prepareStatement("SELECT o_c_id FROM oorder WHERE o_w_id = ? AND o_d_id = ? AND o_id = ?");
             ps.setInt(1, warehouseId);
             ps.setInt(2, d);
             ps.setInt(3, orderId);
-            rs = ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
             if (!rs.next()) { rs.close(); continue; }
             customerId = rs.getInt(1);
             rs.close();

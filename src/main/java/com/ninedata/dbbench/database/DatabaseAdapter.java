@@ -24,14 +24,6 @@ public interface DatabaseAdapter {
     }
 
     /**
-     * Check if database requires ROWID-based subquery for SELECT ... FOR UPDATE with row limit.
-     * Oracle 11g and earlier require this approach since FETCH FIRST is not supported.
-     */
-    default boolean requiresRowIdForLimitForUpdate() {
-        return false;
-    }
-
-    /**
      * Check if database supports SELECT ... FOR UPDATE syntax.
      * SQLite uses file-level locking and does not support FOR UPDATE.
      */

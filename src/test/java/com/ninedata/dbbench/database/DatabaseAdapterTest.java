@@ -25,7 +25,6 @@ class DatabaseAdapterTest {
         config.setType("mysql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertTrue(adapter.supportsLimitSyntax());
-        assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
@@ -35,7 +34,6 @@ class DatabaseAdapterTest {
         config.setType("postgresql");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertTrue(adapter.supportsLimitSyntax());
-        assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
@@ -45,7 +43,6 @@ class DatabaseAdapterTest {
         config.setType("oracle");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertFalse(adapter.supportsLimitSyntax());
-        assertTrue(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
@@ -55,7 +52,6 @@ class DatabaseAdapterTest {
         config.setType("db2");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertFalse(adapter.supportsLimitSyntax());
-        assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
@@ -65,7 +61,6 @@ class DatabaseAdapterTest {
         config.setType("sqlserver");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertFalse(adapter.supportsLimitSyntax());
-        assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
@@ -75,7 +70,6 @@ class DatabaseAdapterTest {
         config.setType("tidb");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertTrue(adapter.supportsLimitSyntax());
-        assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test
@@ -85,7 +79,6 @@ class DatabaseAdapterTest {
         config.setType("oceanbase");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertTrue(adapter.supportsLimitSyntax());
-        assertFalse(adapter.requiresRowIdForLimitForUpdate());
     }
 
     @Test

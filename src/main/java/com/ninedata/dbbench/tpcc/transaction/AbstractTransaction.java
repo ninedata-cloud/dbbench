@@ -17,7 +17,6 @@ public abstract class AbstractTransaction {
     protected final int warehouseId;
     protected final int districtId;
     protected final boolean useLimitSyntax;
-    protected final boolean useRowIdForLimitForUpdate;
     protected final boolean supportsForUpdate;
 
     @Setter
@@ -28,7 +27,6 @@ public abstract class AbstractTransaction {
         this.warehouseId = warehouseId;
         this.districtId = districtId;
         this.useLimitSyntax = adapter.supportsLimitSyntax();
-        this.useRowIdForLimitForUpdate = adapter.requiresRowIdForLimitForUpdate();
         this.supportsForUpdate = adapter.supportsForUpdate();
     }
 
@@ -110,64 +108,6 @@ public abstract class AbstractTransaction {
         } else {
             return baseQuery + " FETCH FIRST 1 ROWS ONLY";
         }
-    }
-
-    /**
-     * Build a SELECT ... LIMIT 1 FOR UPDATE query that works across databases.
-     */
-    protected String buildSelectFirstRowForUpdateQuery(String baseQuery) {
-        if (!supportsForUpdate) {
-            return buildSelectFirstRowQuery(baseQuery);
-        }
-        String dbType = adapter.getDatabaseType().toLowerCase();
-        if (dbType.contains("sql server")) {
-            String query = baseQuery.replaceFirst("(?i)SELECT\\s+", "SELECT TOP 1 ");
-            query = addSqlServerLockHint(query);
-            return query;
-        } else if (useLimitSyntax) {
-            return baseQuery + " LIMIT 1 FOR UPDATE";
-        } else if (useRowIdForLimitForUpdate) {
-            return buildOracleRowIdForUpdateQuery(baseQuery);
-        } else {
-            return baseQuery + " FETCH FIRST 1 ROWS ONLY FOR UPDATE";
-        }
-    }
-
-    private String buildOracleRowIdForUpdateQuery(String baseQuery) {
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-            "(?i)SELECT\\s+.+?\\s+FROM\\s+(\\w+)\\s+(WHERE\\s+.+?)?(ORDER\\s+BY\\s+.+)?$"
-        );
-        java.util.regex.Matcher matcher = pattern.matcher(baseQuery.trim());
-
-        if (matcher.find()) {
-            String tableName = matcher.group(1);
-            String whereClause = matcher.group(2) != null ? matcher.group(2).trim() : "";
-            String orderByClause = matcher.group(3) != null ? matcher.group(3).trim() : "";
-
-            StringBuilder innerQuery = new StringBuilder("SELECT ROWID FROM ");
-            innerQuery.append(tableName);
-            if (!whereClause.isEmpty()) {
-                innerQuery.append(" ").append(whereClause);
-            }
-            if (!orderByClause.isEmpty()) {
-                innerQuery.append(" ").append(orderByClause);
-            }
-
-            java.util.regex.Pattern selectPattern = java.util.regex.Pattern.compile("(?i)SELECT\\s+(.+?)\\s+FROM");
-            java.util.regex.Matcher selectMatcher = selectPattern.matcher(baseQuery);
-            String selectColumns = selectMatcher.find() ? selectMatcher.group(1) : "*";
-
-            StringBuilder result = new StringBuilder("SELECT ");
-            result.append(selectColumns);
-            result.append(" FROM ").append(tableName);
-            result.append(" WHERE ROWID = (SELECT ROWID FROM (");
-            result.append(innerQuery);
-            result.append(") WHERE ROWNUM = 1) FOR UPDATE");
-
-            return result.toString();
-        }
-
-        return baseQuery + " FOR UPDATE";
     }
 
     /**

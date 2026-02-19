@@ -38,11 +38,6 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
     }
 
     @Override
-    public boolean requiresRowIdForLimitForUpdate() {
-        return definition.requiresRowIdForLimitForUpdate();
-    }
-
-    @Override
     public boolean supportsForUpdate() {
         return definition.supportsForUpdate();
     }

@@ -6,7 +6,6 @@ driver: com.yashandb.jdbc.Driver
 url: "jdbc:yasdb://{host}:{port}/{database}"
 validation: "SELECT 1 FROM DUAL"
 noLimit: true
-rowIdForUpdate: true
 dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
 init:
   - "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"

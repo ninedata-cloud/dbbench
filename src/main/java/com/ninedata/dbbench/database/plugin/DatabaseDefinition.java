@@ -21,7 +21,7 @@ import java.util.*;
  * <p>Top-level fields replace nested structures:
  * <ul>
  *   <li>{@code driver} / {@code url} / {@code validation} / {@code urlParams} — replaces {@code jdbc.*}
- *   <li>{@code noLimit} / {@code rowIdForUpdate} / {@code noForUpdate} — replaces {@code capabilities.*}
+ *   <li>{@code noLimit} / {@code noForUpdate} — replaces {@code capabilities.*}
  *   <li>{@code dropStatement} — replaces {@code schema.dropTableStatement}
  *   <li>{@code csvLoad} — string (sql_template), "pg_copy", or object with batch/hint
  *   <li>{@code metrics} / {@code hostMetrics} — simplified list format
@@ -45,7 +45,6 @@ public class DatabaseDefinition {
 
     // ── Capabilities (flat, only non-default) ──
     private boolean noLimit = false;
-    private boolean rowIdForUpdate = false;
     private boolean noForUpdate = false;
 
     // ── Schema ──
@@ -74,7 +73,6 @@ public class DatabaseDefinition {
     public String getUrlTemplate() { return url; }
     public String getValidationQuery() { return validation != null ? validation : "SELECT 1"; }
     public boolean supportsLimitSyntax() { return !noLimit; }
-    public boolean requiresRowIdForLimitForUpdate() { return rowIdForUpdate; }
     public boolean supportsForUpdate() { return !noForUpdate; }
     public String getDropTableStatement() {
         return dropStatement != null ? dropStatement : "DROP TABLE IF EXISTS ${tableName}";

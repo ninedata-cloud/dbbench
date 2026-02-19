@@ -57,7 +57,7 @@ RUN /usr/lib/postgresql/17/bin/pg_ctl -D /var/lib/postgresql/17/main start -w \
 USER root
 
 # Copy the built jar
-COPY --from=builder /app/target/dbbench-0.6.0.jar /app/dbbench.jar
+COPY --from=builder /app/target/dbbench-0.7.0.jar /app/dbbench.jar
 
 # Create startup script
 COPY <<'EOF' /app/start.sh
