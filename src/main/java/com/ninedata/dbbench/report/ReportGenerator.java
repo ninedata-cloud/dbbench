@@ -24,7 +24,7 @@ public class ReportGenerator {
         StringBuilder sb = new StringBuilder();
         Map<String, Object> metrics = metricsRegistry.getCurrentMetrics();
         Map<String, Object> hwInfo = engine.getHardwareInfo();
-        List<MetricsSnapshot> history = metricsRegistry.getHistory();
+        List<MetricsSnapshot> history = metricsRegistry.getHistorySlice(0, metricsRegistry.getHistorySize());
 
         appendTitle(sb);
         appendEnvironment(sb, hwInfo);
@@ -128,12 +128,19 @@ public class ReportGenerator {
     @SuppressWarnings("unchecked")
     private void appendOverallResults(StringBuilder sb, Map<String, Object> metrics) {
         sb.append("## Overall Results\n\n");
+
+        // Highlight NOPM and TPM
+        sb.append("> **NOPM: ").append(metrics.getOrDefault("nopm", 0));
+        sb.append(" | TPM: ").append(metrics.getOrDefault("tpm", 0)).append("**\n\n");
+
         sb.append("| Metric | Value |\n|--------|-------|\n");
+        sb.append("| NOPM (New Orders Per Minute) | ").append(metrics.getOrDefault("nopm", 0)).append(" |\n");
         sb.append("| Total Transactions | ").append(metrics.getOrDefault("totalTransactions", 0)).append(" |\n");
         sb.append("| TPS | ").append(metrics.getOrDefault("tps", 0)).append(" |\n");
         sb.append("| TPM | ").append(metrics.getOrDefault("tpm", 0)).append(" |\n");
         sb.append("| New Order TPM (tpmC) | ").append(metrics.getOrDefault("newOrderTpm", 0)).append(" |\n");
         sb.append("| New Order Count | ").append(metrics.getOrDefault("newOrderCount", 0)).append(" |\n");
+        sb.append("| New Order Success | ").append(metrics.getOrDefault("newOrderSuccess", 0)).append(" |\n");
         sb.append("| New Order Avg Latency | ").append(metrics.getOrDefault("newOrderAvgLatencyMs", 0)).append(" ms |\n");
         sb.append("| Success | ").append(metrics.getOrDefault("totalSuccess", 0)).append(" |\n");
         sb.append("| Rollback | ").append(metrics.getOrDefault("totalRollback", 0)).append(" |\n");

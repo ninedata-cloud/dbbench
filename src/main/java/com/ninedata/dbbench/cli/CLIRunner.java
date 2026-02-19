@@ -88,7 +88,6 @@ public class CLIRunner implements Callable<Integer> {
         dbConfig.setJdbcUrl(props.getProperty("db.jdbc-url", ""));
         dbConfig.setUsername(props.getProperty("db.username", "root"));
         dbConfig.setPassword(props.getProperty("db.password", ""));
-        dbConfig.getPool().setSize(intVal(props, "db.pool.size", 50));
         dbConfig.getPool().setMinIdle(intVal(props, "db.pool.min-idle", 10));
 
         // SSH config
@@ -215,7 +214,6 @@ public class CLIRunner implements Callable<Integer> {
         System.out.printf("  │  Database:    %-26s│%n", db.getType());
         System.out.printf("  │  JDBC URL:    %-26s│%n", truncate(db.getJdbcUrl(), 26));
         System.out.printf("  │  User:        %-26s│%n", db.getUsername());
-        System.out.printf("  │  Pool Size:   %-26d│%n", db.getPool().getSize());
         System.out.printf("  │  Warehouses:  %-26d│%n", bench.getWarehouses());
         System.out.printf("  │  Terminals:   %-26d│%n", bench.getTerminals());
         System.out.printf("  │  Duration:    %-26s│%n", bench.getDuration() + "s");

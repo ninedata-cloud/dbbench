@@ -13,6 +13,8 @@ public class BenchmarkConfig {
     private int duration = 60;
     private int rampup = 10;
     private boolean thinkTime = true;
+    private double keyingTimeMultiplier = 1.0;
+    private double thinkTimeMultiplier = 1.0;
     private int loadConcurrency = 4;
     /**
      * Data loading mode: "auto" (default) uses CSV if DB supports it, "csv" forces CSV, "batch" forces INSERT batch.

@@ -6,21 +6,40 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 public class MetricsRegistry {
     private final Map<String, TransactionMetrics> transactionMetrics = new ConcurrentHashMap<>();
-    @Getter
-    private final List<MetricsSnapshot> history = new CopyOnWriteArrayList<>();
+    private final List<MetricsSnapshot> history = Collections.synchronizedList(new ArrayList<>());
     private volatile long startTime;
     private volatile long endTime;
+
+    // Rampup gate: only record transactions when recording is true
+    private final AtomicBoolean recording = new AtomicBoolean(false);
+    @Getter
+    private volatile long recordingStartTime;
 
     public void reset() {
         transactionMetrics.clear();
         history.clear();
         startTime = System.currentTimeMillis();
         endTime = 0;
+        recording.set(false);
+        recordingStartTime = 0;
+    }
+
+    public void startRecording() {
+        recording.set(true);
+        recordingStartTime = System.currentTimeMillis();
+    }
+
+    public void stopRecording() {
+        recording.set(false);
+    }
+
+    public boolean isRecording() {
+        return recording.get();
     }
 
     public void markEnd() {
@@ -32,6 +51,7 @@ public class MetricsRegistry {
     }
 
     public void recordTransaction(String name, TransactionResult result, long latencyNanos) {
+        if (!recording.get()) return;
         TransactionMetrics metrics = getOrCreate(name);
         switch (result) {
             case SUCCESS -> metrics.recordSuccess(latencyNanos);
@@ -80,28 +100,32 @@ public class MetricsRegistry {
         result.put("overallSuccessRate", totalCount > 0 ? Math.round((totalSuccess * 100.0 / totalCount) * 100.0) / 100.0 : 0);
         result.put("avgLatencyMs", totalCount > 0 ? Math.round((totalLatency / totalCount) * 100.0) / 100.0 : 0);
 
-        long elapsed = (endTime > 0 ? endTime : System.currentTimeMillis()) - startTime;
+        // Elapsed time from recording start (measurement period only)
+        long measureStart = recordingStartTime > 0 ? recordingStartTime : startTime;
+        long elapsed = (endTime > 0 ? endTime : System.currentTimeMillis()) - measureStart;
         result.put("elapsedSeconds", elapsed / 1000);
         double tps = elapsed > 0 ? totalCount * 1000.0 / elapsed : 0;
         result.put("tps", Math.round(tps));
         result.put("tpm", Math.round(tps * 60.0));
 
-        // New Order specific metrics (TPC-C primary metric: tpmC = New Order TPM)
+        // NOPM: New Order Per Minute (TPC-C primary metric)
         TransactionMetrics noMetrics = transactionMetrics.get("NEW_ORDER");
         if (noMetrics != null) {
             long noCount = noMetrics.getCount();
             long noSuccess = noMetrics.getSuccessCount();
-            double noTps = elapsed > 0 ? noCount * 1000.0 / elapsed : 0;
+            double noTps = elapsed > 0 ? noSuccess * 1000.0 / elapsed : 0;
             result.put("newOrderCount", noCount);
             result.put("newOrderSuccess", noSuccess);
             result.put("newOrderTps", Math.round(noTps));
             result.put("newOrderTpm", Math.round(noTps * 60.0));
+            result.put("nopm", Math.round(noTps * 60.0));
             result.put("newOrderAvgLatencyMs", Math.round(noMetrics.getAverageLatencyMs() * 100.0) / 100.0);
         } else {
             result.put("newOrderCount", 0L);
             result.put("newOrderSuccess", 0L);
             result.put("newOrderTps", 0L);
             result.put("newOrderTpm", 0L);
+            result.put("nopm", 0L);
             result.put("newOrderAvgLatencyMs", 0.0);
         }
 
@@ -120,10 +144,18 @@ public class MetricsRegistry {
         snapshot.setClientMetrics(clientMetrics != null ? new HashMap<>(clientMetrics) : new HashMap<>());
         snapshot.setDbHostMetrics(dbHostMetrics != null ? new HashMap<>(dbHostMetrics) : new HashMap<>());
         history.add(snapshot);
+    }
 
-        // Keep only last hour of data (3600 snapshots at 1/sec)
-        while (history.size() > 3600) {
-            history.remove(0);
+    public List<MetricsSnapshot> getHistorySlice(int start, int end) {
+        synchronized (history) {
+            int size = history.size();
+            int s = Math.max(0, Math.min(start, size));
+            int e = Math.max(s, Math.min(end, size));
+            return new ArrayList<>(history.subList(s, e));
         }
+    }
+
+    public int getHistorySize() {
+        return history.size();
     }
 }

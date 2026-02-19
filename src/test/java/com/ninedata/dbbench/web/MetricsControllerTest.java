@@ -32,6 +32,7 @@ class MetricsControllerTest {
         DatabaseConfig dbConfig = new DatabaseConfig();
         BenchmarkConfig benchConfig = new BenchmarkConfig();
         metricsRegistry = new MetricsRegistry();
+        metricsRegistry.startRecording();
         clientMetricsCollector = new ClientMetricsCollector();
         clientMetricsCollector.init();
         engine = new BenchmarkEngine(dbConfig, benchConfig, metricsRegistry, clientMetricsCollector);
@@ -68,6 +69,7 @@ class MetricsControllerTest {
     void testHistoryWithSnapshots() {
         // Add some snapshots
         metricsRegistry.reset();
+        metricsRegistry.startRecording();
         metricsRegistry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
         metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
         metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
@@ -85,6 +87,7 @@ class MetricsControllerTest {
     void testHistoryLimit() {
         // Add more snapshots than limit
         metricsRegistry.reset();
+        metricsRegistry.startRecording();
         for (int i = 0; i < 10; i++) {
             metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
         }
@@ -102,6 +105,7 @@ class MetricsControllerTest {
     void testTpsHistory() {
         // Add some snapshots with TPS data
         metricsRegistry.reset();
+        metricsRegistry.startRecording();
         metricsRegistry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
         metricsRegistry.takeSnapshot(new HashMap<>(), new HashMap<>());
 
@@ -146,6 +150,7 @@ class MetricsControllerTest {
     @DisplayName("Current metrics should include transaction metrics")
     void testCurrentIncludesTransactionMetrics() {
         metricsRegistry.reset();
+        metricsRegistry.startRecording();
         metricsRegistry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         ResponseEntity<Map<String, Object>> response = controller.current();

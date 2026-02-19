@@ -26,7 +26,15 @@
       "Bash(xargs:*)",
       "WebSearch",
       "WebFetch(domain:cdnjs.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(mvn package:*)",
+      "WebFetch(domain:benchmarksql.readthedocs.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:fringe.davesource.com)",
+      "WebFetch(domain:yangwang83.github.io)",
+      "WebFetch(domain:zedware.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }

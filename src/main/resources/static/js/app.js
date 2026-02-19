@@ -107,7 +107,7 @@ async function loadInitialState() {
 
 async function restoreChartHistory() {
     try {
-        const res = await fetch('/api/metrics/history?limit=3600');
+        const res = await fetch('/api/metrics/history');
         const history = await res.json();
 
         if (history && history.length > 0) {
@@ -608,7 +608,7 @@ function updateMetrics(data) {
         const tx = data.transaction;
         document.getElementById('tps').textContent = Math.round(tx.tps || 0);
         document.getElementById('tpm').textContent = Math.round(tx.tpm || 0);
-        document.getElementById('newOrderTpm').textContent = Math.round(tx.newOrderTpm || 0);
+        document.getElementById('newOrderTpm').textContent = Math.round(tx.nopm || tx.newOrderTpm || 0);
         document.getElementById('newOrderLatency').textContent = (tx.newOrderAvgLatencyMs?.toFixed(2) || '0.00') + ' ms';
         document.getElementById('totalTx').textContent = tx.totalTransactions || 0;
         document.getElementById('successRate').textContent = (tx.overallSuccessRate || 0).toFixed(1) + '%';
@@ -843,7 +843,7 @@ function updateStatus(status) {
     document.getElementById('btnLoad').disabled = isRunning || isLoading;
     document.getElementById('btnClean').disabled = isRunning || isLoading;
     document.getElementById('btnConfig').disabled = !canConfig;
-    document.getElementById('btnReport').disabled = (status !== 'STOPPED');
+    document.getElementById('btnReport').disabled = (status !== 'STOPPED' && status !== 'ERROR' && status !== 'RUNNING');
 
     // Show/hide progress container
     const progressContainer = document.getElementById('loadProgressContainer');
@@ -867,7 +867,6 @@ function displayConfig(cfg) {
     if (cfg.database) {
         document.getElementById('cfgDbType').textContent = cfg.database.type?.toUpperCase() || '-';
         document.getElementById('cfgJdbcUrl').textContent = cfg.database.jdbcUrl || '-';
-        document.getElementById('cfgPoolSize').textContent = cfg.database.poolSize || '-';
     }
 
     if (cfg.benchmark) {
@@ -918,7 +917,6 @@ function openConfigModal() {
     document.getElementById('cfgFormJdbcUrl').value = cfg.database?.jdbcUrl || '';
     document.getElementById('cfgFormDbUser').value = cfg.database?.username || '';
     document.getElementById('cfgFormDbPass').value = savedDbPassword;
-    document.getElementById('cfgFormPoolSize').value = cfg.database?.poolSize || 50;
 
     // Benchmark config
     document.getElementById('cfgFormWarehouses').value = cfg.benchmark?.warehouses || 10;
@@ -961,8 +959,7 @@ async function saveConfig() {
         database: {
             type: dbType,
             jdbcUrl: document.getElementById('cfgFormJdbcUrl').value,
-            username: document.getElementById('cfgFormDbUser').value,
-            poolSize: parseInt(document.getElementById('cfgFormPoolSize').value)
+            username: document.getElementById('cfgFormDbUser').value
         },
         benchmark: {
             warehouses: parseInt(document.getElementById('cfgFormWarehouses').value),
@@ -1891,7 +1888,6 @@ function fillConfigForm(cfg) {
         const dbPass = cfg.database.password || '';
         document.getElementById('cfgFormDbPass').value = dbPass;
         if (dbPass) savedDbPassword = dbPass;
-        document.getElementById('cfgFormPoolSize').value = cfg.database.poolSize || 50;
     }
     if (cfg.benchmark) {
         document.getElementById('cfgFormWarehouses').value = cfg.benchmark.warehouses || 10;
@@ -1981,8 +1977,7 @@ function buildConfigFromForm() {
             type: dbType,
             jdbcUrl: document.getElementById('cfgFormJdbcUrl').value,
             username: document.getElementById('cfgFormDbUser').value,
-            password: document.getElementById('cfgFormDbPass').value || savedDbPassword,
-            poolSize: parseInt(document.getElementById('cfgFormPoolSize').value)
+            password: document.getElementById('cfgFormDbPass').value || savedDbPassword
         },
         ssh: {
             enabled: document.getElementById('cfgFormSshEnabled').checked,

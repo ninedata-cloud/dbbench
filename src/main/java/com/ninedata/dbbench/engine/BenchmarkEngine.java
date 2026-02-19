@@ -32,8 +32,10 @@ public class BenchmarkEngine {
 
     private DatabaseAdapter adapter;
     private SshMetricsCollector sshCollector;
+    private boolean dbHostIsLocal;
     private ExecutorService executorService;
     private ScheduledExecutorService metricsScheduler;
+    private DeliveryScheduler deliveryScheduler;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean loading = new AtomicBoolean(false);
     @Getter
@@ -55,6 +57,12 @@ public class BenchmarkEngine {
     // Cached hardware info (static, collected once)
     private volatile Map<String, Object> cachedClientHardwareInfo = null;
     private volatile Map<String, Object> cachedDbServerHardwareInfo = null;
+
+    // TPC-C Keying time means (seconds) per transaction type
+    // Index: 0=NewOrder, 1=Payment, 2=OrderStatus, 3=Delivery, 4=StockLevel
+    private static final double[] KEYING_TIME_MEAN = {18.0, 3.0, 2.0, 2.0, 2.0};
+    // TPC-C Think time means (seconds) per transaction type
+    private static final double[] THINK_TIME_MEAN = {12.0, 12.0, 10.0, 5.0, 5.0};
 
     public BenchmarkEngine(DatabaseConfig dbConfig, BenchmarkConfig benchConfig,
                            MetricsRegistry metricsRegistry, ClientMetricsCollector clientMetricsCollector) {
@@ -90,7 +98,6 @@ public class BenchmarkEngine {
             logCallback.accept(data);
         }
 
-        // Also log to slf4j
         switch (level) {
             case "ERROR" -> log.error(message);
             case "WARN" -> log.warn(message);
@@ -111,7 +118,6 @@ public class BenchmarkEngine {
             throw new IllegalStateException("Cannot update config while running or loading");
         }
 
-        // Update database config
         if (newConfig.containsKey("database")) {
             @SuppressWarnings("unchecked")
             Map<String, Object> db = (Map<String, Object>) newConfig.get("database");
@@ -119,10 +125,8 @@ public class BenchmarkEngine {
             if (db.containsKey("jdbcUrl")) dbConfig.setJdbcUrl((String) db.get("jdbcUrl"));
             if (db.containsKey("username")) dbConfig.setUsername((String) db.get("username"));
             if (db.containsKey("password")) dbConfig.setPassword((String) db.get("password"));
-            if (db.containsKey("poolSize")) dbConfig.getPool().setSize(((Number) db.get("poolSize")).intValue());
         }
 
-        // Update benchmark config
         if (newConfig.containsKey("benchmark")) {
             @SuppressWarnings("unchecked")
             Map<String, Object> bench = (Map<String, Object>) newConfig.get("benchmark");
@@ -134,7 +138,6 @@ public class BenchmarkEngine {
             if (bench.containsKey("loadMode")) benchConfig.setLoadMode((String) bench.get("loadMode"));
         }
 
-        // Update transaction mix
         if (newConfig.containsKey("transactionMix")) {
             @SuppressWarnings("unchecked")
             Map<String, Object> mix = (Map<String, Object>) newConfig.get("transactionMix");
@@ -145,14 +148,12 @@ public class BenchmarkEngine {
             if (mix.containsKey("stockLevel")) benchConfig.getMix().setStockLevel(((Number) mix.get("stockLevel")).intValue());
         }
 
-        // Close existing adapter if config changed
         if (adapter != null) {
             adapter.close();
             adapter = null;
             status = "IDLE";
         }
 
-        // Update SSH config
         if (newConfig.containsKey("ssh")) {
             @SuppressWarnings("unchecked")
             Map<String, Object> ssh = (Map<String, Object>) newConfig.get("ssh");
@@ -166,7 +167,6 @@ public class BenchmarkEngine {
             if (ssh.containsKey("passphrase")) sshCfg.setPassphrase((String) ssh.get("passphrase"));
         }
 
-        // Disconnect SSH if config changed (will reconnect on next initialize)
         if (sshCollector != null) {
             sshCollector.disconnect();
             sshCollector = null;
@@ -178,6 +178,11 @@ public class BenchmarkEngine {
 
     public void initialize() throws SQLException {
         status = "INITIALIZING";
+
+        int poolSize = benchConfig.getTerminals() + 10;
+        dbConfig.getPool().setSize(poolSize);
+        addLog("INFO", String.format("Connection pool size auto-set to %d (terminals %d + 10)", poolSize, benchConfig.getTerminals()));
+
         addLog("INFO", "Initializing database connection...");
         addLog("INFO", String.format("Database: %s, URL: %s", dbConfig.getType(), dbConfig.getJdbcUrl()));
 
@@ -197,20 +202,24 @@ public class BenchmarkEngine {
             throw new SQLException("Failed to initialize database connection: " + e.getMessage(), e);
         }
 
-        // Initialize SSH metrics collector if enabled
         connectSshCollector();
     }
 
     private void connectSshCollector() {
-        // Disconnect existing
         if (sshCollector != null) {
             sshCollector.disconnect();
             sshCollector = null;
         }
         cachedDbServerHardwareInfo = null;
+        dbHostIsLocal = false;
 
-        if (dbConfig.getSsh().isEnabled()) {
-            String host = dbConfig.getEffectiveSshHost();
+        String host = dbConfig.getEffectiveSshHost();
+        if (!host.isBlank() && isLocalHost(host)) {
+            dbHostIsLocal = true;
+            addLog("INFO", "DB host is local (" + host + "), using OS metrics directly");
+        }
+
+        if (dbConfig.getSsh().isEnabled() && !dbHostIsLocal) {
             if (host.isBlank()) {
                 addLog("WARN", "SSH enabled but no host could be determined");
                 return;
@@ -221,27 +230,23 @@ public class BenchmarkEngine {
                 addLog("INFO", "SSH metrics collector connected to " + host);
             } catch (Exception e) {
                 addLog("WARN", "SSH metrics connection failed: " + e.getMessage() + " (will retry on next collection)");
-                // Keep the collector so it can retry
             }
         }
     }
 
-    /**
-     * Ensure database connection is initialized
-     */
+    private static boolean isLocalHost(String host) {
+        return "127.0.0.1".equals(host) || "localhost".equalsIgnoreCase(host) || "::1".equals(host);
+    }
+
     private void ensureInitialized() throws SQLException {
         if (adapter == null || !isAdapterReady()) {
             initialize();
         }
     }
 
-    /**
-     * Check if adapter is ready (has valid connection pool)
-     */
     private boolean isAdapterReady() {
         if (adapter == null) return false;
         try {
-            // Try to get a connection to verify the pool is working
             adapter.getConnection().close();
             return true;
         } catch (Exception e) {
@@ -249,9 +254,6 @@ public class BenchmarkEngine {
         }
     }
 
-    /**
-     * Check if TPC-C data has been loaded
-     */
     private boolean isDataLoaded() {
         try (var conn = adapter.getConnection();
              var stmt = conn.createStatement();
@@ -260,15 +262,11 @@ public class BenchmarkEngine {
                 return rs.getInt(1) > 0;
             }
         } catch (Exception e) {
-            // Table doesn't exist or other error
             return false;
         }
         return false;
     }
 
-    /**
-     * Synchronous data loading for CLI usage
-     */
     public void loadData(Consumer<String> progressCallback) throws SQLException {
         if (loading.get()) {
             throw new IllegalStateException("Data loading already in progress");
@@ -306,9 +304,6 @@ public class BenchmarkEngine {
         }
     }
 
-    /**
-     * Asynchronous data loading for Web UI usage
-     */
     public void loadDataAsync() throws SQLException {
         if (loading.get()) {
             throw new IllegalStateException("Data loading already in progress");
@@ -352,11 +347,9 @@ public class BenchmarkEngine {
                 status = "LOADED";
                 addLog("INFO", "Data load completed successfully");
 
-                // Broadcast final status change
                 broadcastStatusChange("LOADED");
             } catch (Exception e) {
                 currentLoader = null;
-                // Check if it was cancelled
                 if (e.getMessage() != null && e.getMessage().contains("cancelled")) {
                     status = "CANCELLED";
                     addLog("WARN", "Data load cancelled by user");
@@ -377,9 +370,6 @@ public class BenchmarkEngine {
         });
     }
 
-    /**
-     * Cancel the current data loading process
-     */
     public void cancelLoad() {
         if (!loading.get()) {
             throw new IllegalStateException("No data loading in progress");
@@ -416,18 +406,12 @@ public class BenchmarkEngine {
         }
     }
 
-    /**
-     * Start periodic metrics collection (OS, database, SSH host)
-     */
     private void startMetricsCollection() {
         stopMetricsCollection();
-        metricsScheduler = Executors.newSingleThreadScheduledExecutor();
+        metricsScheduler = Executors.newScheduledThreadPool(2);
         metricsScheduler.scheduleAtFixedRate(this::collectAndBroadcastMetrics, 1, 1, TimeUnit.SECONDS);
     }
 
-    /**
-     * Stop periodic metrics collection
-     */
     private void stopMetricsCollection() {
         if (metricsScheduler != null && !metricsScheduler.isShutdown()) {
             metricsScheduler.shutdownNow();
@@ -456,7 +440,6 @@ public class BenchmarkEngine {
 
         ensureInitialized();
 
-        // Check if data is loaded
         if (!isDataLoaded()) {
             throw new IllegalStateException("No TPC-C data found. Please load data first.");
         }
@@ -465,22 +448,30 @@ public class BenchmarkEngine {
         status = "RUNNING";
         metricsRegistry.reset();
 
-        // Set error callback for transactions
         AbstractTransaction.setErrorCallback(this::addLog);
 
         int terminals = benchConfig.getTerminals();
         executorService = Executors.newFixedThreadPool(terminals);
 
-        addLog("INFO", String.format("Starting benchmark with %d terminals for %d seconds", terminals, benchConfig.getDuration()));
+        // Create async delivery scheduler
+        deliveryScheduler = new DeliveryScheduler(adapter, metricsRegistry, benchConfig.getWarehouses());
+
+        int rampup = benchConfig.getRampup();
+        int duration = benchConfig.getDuration();
+
+        addLog("INFO", String.format("Starting benchmark: %d terminals, %ds rampup, %ds duration, thinkTime=%s",
+                terminals, rampup, duration, benchConfig.isThinkTime()));
+        if (benchConfig.isThinkTime()) {
+            addLog("INFO", String.format("Keying time multiplier: %.1f, Think time multiplier: %.1f",
+                    benchConfig.getKeyingTimeMultiplier(), benchConfig.getThinkTimeMultiplier()));
+        }
         addLog("INFO", String.format("Transaction mix: NewOrder=%d%%, Payment=%d%%, OrderStatus=%d%%, Delivery=%d%%, StockLevel=%d%%",
                 benchConfig.getMix().getNewOrder(), benchConfig.getMix().getPayment(),
                 benchConfig.getMix().getOrderStatus(), benchConfig.getMix().getDelivery(),
                 benchConfig.getMix().getStockLevel()));
 
-        // Broadcast status change
         broadcastStatusChange("RUNNING");
 
-        // Start metrics collection
         startMetricsCollection();
 
         // Start terminal workers
@@ -491,8 +482,13 @@ public class BenchmarkEngine {
             executorService.submit(() -> runTerminal(terminalId, warehouseId, districtId));
         }
 
-        // Schedule stop on the metrics scheduler
-        metricsScheduler.schedule(this::stop, benchConfig.getDuration(), TimeUnit.SECONDS);
+        // Schedule rampup completion and stop
+        metricsScheduler.schedule(() -> {
+            addLog("INFO", "Rampup complete, starting measurement");
+            metricsRegistry.startRecording();
+        }, rampup, TimeUnit.SECONDS);
+
+        metricsScheduler.schedule(this::stop, rampup + duration, TimeUnit.SECONDS);
     }
 
     private void runTerminal(int terminalId, int warehouseId, int districtId) {
@@ -506,43 +502,95 @@ public class BenchmarkEngine {
         };
         int totalWeight = Arrays.stream(weights).sum();
 
-        while (running.get()) {
-            // Select transaction based on mix
-            int r = random.nextInt(totalWeight);
-            int cumulative = 0;
-            int txType = 0;
-            for (int i = 0; i < weights.length; i++) {
-                cumulative += weights[i];
-                if (r < cumulative) {
-                    txType = i;
-                    break;
+        // Phase 1: Long-lived connection via TerminalContext
+        TerminalContext ctx = null;
+        try {
+            ctx = new TerminalContext(adapter, warehouseId, districtId, benchConfig.getWarehouses());
+        } catch (SQLException e) {
+            log.error("Terminal {} failed to get connection: {}", terminalId, e.getMessage());
+            return;
+        }
+
+        try {
+            while (running.get()) {
+                // Select transaction based on mix
+                int r = random.nextInt(totalWeight);
+                int cumulative = 0;
+                int txType = 0;
+                for (int i = 0; i < weights.length; i++) {
+                    cumulative += weights[i];
+                    if (r < cumulative) {
+                        txType = i;
+                        break;
+                    }
+                }
+
+                // Phase 3a: Keying time (before transaction)
+                if (benchConfig.isThinkTime()) {
+                    double keyMean = KEYING_TIME_MEAN[txType] * benchConfig.getKeyingTimeMultiplier();
+                    long keyTimeMs = (long) (-Math.log(random.nextDouble()) * keyMean * 1000);
+                    if (keyTimeMs > 0) {
+                        try {
+                            Thread.sleep(keyTimeMs);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+
+                if (!running.get()) break;
+
+                // Phase 6: Delivery is async
+                if (txType == 3) {
+                    deliveryScheduler.submit(warehouseId, districtId);
+                } else {
+                    AbstractTransaction tx = switch (txType) {
+                        case 0 -> new NewOrderTransaction(adapter, warehouseId, districtId);
+                        case 1 -> new PaymentTransaction(adapter, warehouseId, districtId);
+                        case 2 -> new OrderStatusTransaction(adapter, warehouseId, districtId);
+                        case 4 -> new StockLevelTransaction(adapter, warehouseId, districtId);
+                        default -> new NewOrderTransaction(adapter, warehouseId, districtId);
+                    };
+
+                    long startTime = System.nanoTime();
+                    TransactionResult result;
+                    try {
+                        result = tx.execute(ctx);
+                    } catch (Exception e) {
+                        // Connection may be broken, try reconnect
+                        log.warn("Terminal {} transaction error, reconnecting: {}", terminalId, e.getMessage());
+                        try {
+                            ctx.reconnect();
+                        } catch (SQLException re) {
+                            log.error("Terminal {} reconnect failed: {}", terminalId, re.getMessage());
+                            break;
+                        }
+                        continue;
+                    }
+                    long latency = System.nanoTime() - startTime;
+
+                    metricsRegistry.recordTransaction(tx.getName(), result, latency);
+                }
+
+                // Phase 3a: Think time (after transaction)
+                if (benchConfig.isThinkTime()) {
+                    double thinkMean = THINK_TIME_MEAN[txType] * benchConfig.getThinkTimeMultiplier();
+                    long thinkTimeMs = (long) (-Math.log(random.nextDouble()) * thinkMean * 1000);
+                    if (thinkTimeMs > 0) {
+                        try {
+                            Thread.sleep(thinkTimeMs);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                } else {
+                    // No think time — minimal yield to avoid busy loop
                 }
             }
-
-            AbstractTransaction tx = switch (txType) {
-                case 0 -> new NewOrderTransaction(adapter, warehouseId, districtId);
-                case 1 -> new PaymentTransaction(adapter, warehouseId, districtId);
-                case 2 -> new OrderStatusTransaction(adapter, warehouseId, districtId);
-                case 3 -> new DeliveryTransaction(adapter, warehouseId, districtId);
-                case 4 -> new StockLevelTransaction(adapter, warehouseId, districtId);
-                default -> new NewOrderTransaction(adapter, warehouseId, districtId);
-            };
-
-            long startTime = System.nanoTime();
-            TransactionResult result = tx.execute();
-            long latency = System.nanoTime() - startTime;
-
-            metricsRegistry.recordTransaction(tx.getName(), result, latency);
-
-            // Think time
-            if (benchConfig.isThinkTime()) {
-                try {
-                    Thread.sleep(random.nextInt(100) + 50);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+        } finally {
+            ctx.close();
         }
     }
 
@@ -551,12 +599,12 @@ public class BenchmarkEngine {
             Map<String, Object> dbMetrics = adapter.collectMetrics();
             Map<String, Object> clientMetrics = clientMetricsCollector.collect();
 
-            // Use SSH metrics for dbHost if available, otherwise fall back to SQL-based
             Map<String, Object> hostMetrics;
-            if (sshCollector != null && sshCollector.isConnected()) {
+            if (dbHostIsLocal) {
+                hostMetrics = clientMetrics;
+            } else if (sshCollector != null && sshCollector.isConnected()) {
                 hostMetrics = sshCollector.collect();
             } else if (sshCollector != null) {
-                // SSH configured but disconnected - try reconnect, use SQL fallback for now
                 hostMetrics = adapter.collectHostMetrics();
             } else {
                 hostMetrics = adapter.collectHostMetrics();
@@ -572,7 +620,6 @@ public class BenchmarkEngine {
                 allMetrics.put("dbHost", hostMetrics);
                 allMetrics.put("status", status);
 
-                // Include SSH connection status so frontend can update in real-time
                 Map<String, Object> sshStatus = new LinkedHashMap<>();
                 sshStatus.put("enabled", dbConfig.getSsh().isEnabled());
                 sshStatus.put("connected", sshCollector != null && sshCollector.isConnected());
@@ -595,9 +642,15 @@ public class BenchmarkEngine {
         }
         running.set(false);
         status = "STOPPING";
+        metricsRegistry.stopRecording();
         metricsRegistry.markEnd();
 
         addLog("INFO", "Stopping benchmark...");
+
+        if (deliveryScheduler != null) {
+            deliveryScheduler.shutdown();
+            deliveryScheduler = null;
+        }
 
         if (executorService != null) {
             executorService.shutdownNow();
@@ -613,16 +666,13 @@ public class BenchmarkEngine {
         status = "STOPPED";
         addLog("INFO", "Benchmark stopped");
 
-        // Log final results
         Map<String, Object> metrics = metricsRegistry.getCurrentMetrics();
-        addLog("INFO", String.format("Final Results: TPS=%.2f, Total=%d, Success=%.2f%%, AvgLatency=%.2fms",
-                metrics.get("tps"), metrics.get("totalTransactions"),
+        addLog("INFO", String.format("Final Results: NOPM=%d, TPS=%d, Total=%d, Success=%.2f%%, AvgLatency=%.2fms",
+                metrics.get("nopm"), metrics.get("tps"), metrics.get("totalTransactions"),
                 metrics.get("overallSuccessRate"), metrics.get("avgLatencyMs")));
 
-        // Final metrics broadcast
         collectAndBroadcastMetrics();
 
-        // Broadcast status change
         broadcastStatusChange("STOPPED");
     }
 
@@ -646,24 +696,6 @@ public class BenchmarkEngine {
         return loading.get();
     }
 
-    public Map<String, Object> getHardwareInfo() {
-        Map<String, Object> result = new LinkedHashMap<>();
-
-        // Client hardware info - collect once and cache
-        if (cachedClientHardwareInfo == null) {
-            cachedClientHardwareInfo = clientMetricsCollector.collectHardwareInfo();
-        }
-        result.put("client", cachedClientHardwareInfo);
-
-        // DB server hardware info - from SSH if available
-        if (cachedDbServerHardwareInfo == null && sshCollector != null && sshCollector.isConnected()) {
-            cachedDbServerHardwareInfo = sshCollector.collectHardwareInfo();
-        }
-        result.put("dbServer", cachedDbServerHardwareInfo != null ? cachedDbServerHardwareInfo : new LinkedHashMap<>());
-
-        return result;
-    }
-
     public Map<String, Object> getResults() {
         Map<String, Object> results = new LinkedHashMap<>();
         results.put("status", status);
@@ -671,10 +703,29 @@ public class BenchmarkEngine {
         return results;
     }
 
+    public Map<String, Object> getHardwareInfo() {
+        Map<String, Object> info = new LinkedHashMap<>();
+
+        if (cachedClientHardwareInfo == null) {
+            cachedClientHardwareInfo = clientMetricsCollector.collectHardwareInfo();
+        }
+        info.put("client", cachedClientHardwareInfo);
+
+        if (cachedDbServerHardwareInfo == null && sshCollector != null && sshCollector.isConnected()) {
+            try {
+                cachedDbServerHardwareInfo = sshCollector.collectHardwareInfo();
+            } catch (Exception e) {
+                log.warn("Failed to collect DB server hardware info: {}", e.getMessage());
+            }
+        }
+        info.put("dbServer", cachedDbServerHardwareInfo != null ? cachedDbServerHardwareInfo : Collections.emptyMap());
+
+        return info;
+    }
+
     public Map<String, Object> getConfig() {
         Map<String, Object> config = new LinkedHashMap<>();
 
-        // Database config
         Map<String, Object> db = new LinkedHashMap<>();
         db.put("type", dbConfig.getType());
         db.put("jdbcUrl", dbConfig.getJdbcUrl());
@@ -682,18 +733,18 @@ public class BenchmarkEngine {
         db.put("poolSize", dbConfig.getPool().getSize());
         config.put("database", db);
 
-        // Benchmark config
         Map<String, Object> bench = new LinkedHashMap<>();
         bench.put("warehouses", benchConfig.getWarehouses());
         bench.put("terminals", benchConfig.getTerminals());
         bench.put("duration", benchConfig.getDuration());
         bench.put("rampup", benchConfig.getRampup());
         bench.put("thinkTime", benchConfig.isThinkTime());
+        bench.put("keyingTimeMultiplier", benchConfig.getKeyingTimeMultiplier());
+        bench.put("thinkTimeMultiplier", benchConfig.getThinkTimeMultiplier());
         bench.put("loadConcurrency", benchConfig.getLoadConcurrency());
         bench.put("loadMode", benchConfig.getLoadMode());
         config.put("benchmark", bench);
 
-        // Transaction mix
         Map<String, Object> mix = new LinkedHashMap<>();
         mix.put("newOrder", benchConfig.getMix().getNewOrder());
         mix.put("payment", benchConfig.getMix().getPayment());
@@ -702,7 +753,6 @@ public class BenchmarkEngine {
         mix.put("stockLevel", benchConfig.getMix().getStockLevel());
         config.put("transactionMix", mix);
 
-        // SSH config (mask sensitive fields)
         Map<String, Object> ssh = new LinkedHashMap<>();
         ssh.put("enabled", dbConfig.getSsh().isEnabled());
         ssh.put("host", dbConfig.getEffectiveSshHost());

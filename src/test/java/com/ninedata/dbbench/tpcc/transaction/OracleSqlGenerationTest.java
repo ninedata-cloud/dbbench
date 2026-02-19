@@ -33,7 +33,7 @@ class OracleSqlGenerationTest {
         public String getName() { return "TEST"; }
 
         @Override
-        protected boolean doExecute(Connection conn) { return true; }
+        protected boolean doExecute(com.ninedata.dbbench.engine.TerminalContext ctx) { return true; }
 
         public String testBuildSelectFirstRowForUpdateQuery(String baseQuery) {
             return buildSelectFirstRowForUpdateQuery(baseQuery);

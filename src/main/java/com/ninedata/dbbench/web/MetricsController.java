@@ -2,7 +2,6 @@ package com.ninedata.dbbench.web;
 
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
-import com.ninedata.dbbench.metrics.MetricsSnapshot;
 import com.ninedata.dbbench.metrics.ClientMetricsCollector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -39,10 +38,10 @@ public class MetricsController {
         return ResponseEntity.ok(response);
     }
     @GetMapping("/history")
-    public ResponseEntity<?> history(@RequestParam(defaultValue = "3600") int limit) {
-        var history = metricsRegistry.getHistory();
-        int start = Math.max(0, history.size() - limit);
-        return ResponseEntity.ok(history.subList(start, history.size()));
+    public ResponseEntity<?> history(@RequestParam(defaultValue = "0") int limit) {
+        int size = metricsRegistry.getHistorySize();
+        int start = (limit > 0) ? Math.max(0, size - limit) : 0;
+        return ResponseEntity.ok(metricsRegistry.getHistorySlice(start, size));
     }
 
     @GetMapping("/hardware-info")
@@ -54,11 +53,11 @@ public class MetricsController {
      * Get TPS history for chart restoration after page refresh
      */
     @GetMapping("/tps-history")
-    public ResponseEntity<?> tpsHistory(@RequestParam(defaultValue = "3600") int limit) {
-        List<MetricsSnapshot> history = metricsRegistry.getHistory();
-        int start = Math.max(0, history.size() - limit);
+    public ResponseEntity<?> tpsHistory(@RequestParam(defaultValue = "0") int limit) {
+        int size = metricsRegistry.getHistorySize();
+        int start = (limit > 0) ? Math.max(0, size - limit) : 0;
 
-        List<Map<String, Object>> tpsData = history.subList(start, history.size()).stream()
+        List<Map<String, Object>> tpsData = metricsRegistry.getHistorySlice(start, size).stream()
                 .map(snapshot -> {
                     Map<String, Object> point = new LinkedHashMap<>();
                     point.put("timestamp", snapshot.getTimestamp());

@@ -91,7 +91,6 @@ public class ProfileService {
         putIfPresent(props, "db.jdbc-url", db.get("jdbcUrl"));
         putIfPresent(props, "db.username", db.get("username"));
         putIfPresent(props, "db.password", db.get("password"));
-        putIfPresent(props, "db.pool.size", db.get("poolSize"));
         Map<String, Object> ssh = (Map<String, Object>) config.getOrDefault("ssh", Map.of());
         putIfPresent(props, "db.ssh.enabled", ssh.get("enabled"));
         putIfPresent(props, "db.ssh.host", ssh.get("host"));
@@ -131,7 +130,6 @@ public class ProfileService {
         db.put("jdbcUrl", props.getProperty("db.jdbc-url", ""));
         db.put("username", props.getProperty("db.username", ""));
         db.put("password", props.getProperty("db.password", ""));
-        db.put("poolSize", intVal(props, "db.pool.size", 50));
         config.put("database", db);
 
         Map<String, Object> ssh = new LinkedHashMap<>();

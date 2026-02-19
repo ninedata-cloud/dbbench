@@ -20,6 +20,7 @@ class MetricsRegistryTest {
     void setUp() {
         registry = new MetricsRegistry();
         registry.reset();
+        registry.startRecording();
     }
 
     @Test
@@ -74,7 +75,7 @@ class MetricsRegistryTest {
         // After reset, getOrCreate should return fresh metrics
         TransactionMetrics metrics = registry.getOrCreate("NEW_ORDER");
         assertEquals(0, metrics.getCount());
-        assertTrue(registry.getHistory().isEmpty());
+        assertTrue(registry.getHistorySize() == 0);
     }
 
     @Test
@@ -110,7 +111,7 @@ class MetricsRegistryTest {
 
         registry.takeSnapshot(dbMetrics, clientMetrics);
 
-        List<MetricsSnapshot> history = registry.getHistory();
+        List<MetricsSnapshot> history = registry.getHistorySlice(0, registry.getHistorySize());
         assertEquals(1, history.size());
 
         MetricsSnapshot snapshot = history.get(0);
@@ -127,7 +128,7 @@ class MetricsRegistryTest {
 
         registry.takeSnapshot(null, null);
 
-        List<MetricsSnapshot> history = registry.getHistory();
+        List<MetricsSnapshot> history = registry.getHistorySlice(0, registry.getHistorySize());
         assertEquals(1, history.size());
 
         MetricsSnapshot snapshot = history.get(0);
@@ -138,19 +139,20 @@ class MetricsRegistryTest {
     }
 
     @Test
-    @DisplayName("Should limit history to 3600 entries")
-    void testHistoryLimit() {
-        for (int i = 0; i < 3700; i++) {
+    @DisplayName("Should retain all history entries without limit")
+    void testHistoryNoLimit() {
+        for (int i = 0; i < 5000; i++) {
             registry.takeSnapshot(new HashMap<>(), new HashMap<>());
         }
 
-        assertEquals(3600, registry.getHistory().size());
+        assertEquals(5000, registry.getHistorySize());
     }
 
     @Test
     @DisplayName("Should calculate TPS correctly")
     void testTpsCalculation() throws InterruptedException {
         registry.reset();
+        registry.startRecording();
 
         // Record some transactions
         for (int i = 0; i < 100; i++) {
@@ -171,6 +173,7 @@ class MetricsRegistryTest {
     @DisplayName("Should mark end time correctly")
     void testMarkEnd() throws InterruptedException {
         registry.reset();
+        registry.startRecording();
         registry.recordTransaction("NEW_ORDER", TransactionResult.SUCCESS, 1_000_000);
 
         Thread.sleep(50);

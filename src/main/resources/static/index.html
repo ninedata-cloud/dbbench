@@ -60,7 +60,6 @@
                 </h3>
                 <div class="config-grid" id="configDisplay">
                     <div class="config-item"><span class="config-label">Database</span><span class="config-value" id="cfgDbType">-</span></div>
-                    <div class="config-item"><span class="config-label">Pool Size</span><span class="config-value" id="cfgPoolSize">-</span></div>
                     <div class="config-item"><span class="config-label">Warehouses</span><span class="config-value" id="cfgWarehouses">-</span></div>
                     <div class="config-item"><span class="config-label">Terminals</span><span class="config-value" id="cfgTerminals">-</span></div>
                     <div class="config-item"><span class="config-label">Duration</span><span class="config-value" id="cfgDuration">-</span></div>
@@ -112,7 +111,7 @@
                     <span class="metric-value highlight" id="tpm">0.00</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">New Order TPM (tpmC)</span>
+                    <span class="metric-label">NOPM (tpmC)</span>
                     <span class="metric-value highlight" id="newOrderTpm">0.00</span>
                 </div>
                 <div class="metric">
@@ -351,10 +350,6 @@
                             <select id="cfgFormDbType">
                                 <!-- Populated dynamically from /api/benchmark/database-types -->
                             </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="cfgFormPoolSize">Connection Pool Size</label>
-                            <input type="number" id="cfgFormPoolSize" placeholder="50">
                         </div>
                     </div>
                     <div class="form-group">
