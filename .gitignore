@@ -44,3 +44,4 @@ surefire-reports/
 # Sensitive files
 application-local.properties
 *.env
+profiles/

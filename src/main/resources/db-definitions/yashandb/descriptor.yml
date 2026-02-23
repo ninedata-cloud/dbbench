@@ -8,14 +8,16 @@ validation: "SELECT 1 FROM DUAL"
 noLimit: true
 dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
 init:
-  - "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
+  - "ALTER SESSION SET DATE_FORMAT= = 'YYYY-MM-DD HH24:MI:SS'"
 metrics:
   - active_connections: "SELECT COUNT(*) FROM V$SESSION WHERE STATUS = 'ACTIVE'"
   - buffer_pool_hit_ratio: >
-      SELECT (1 - (phy.value / NULLIF(cur.value + con.value, 0))) * 100
-      FROM V$SYSSTAT phy, V$SYSSTAT cur, V$SYSSTAT con
-      WHERE phy.name = 'physical reads' AND cur.name = 'db block gets' AND con.name = 'consistent gets'
-  - lock_waits: "SELECT COUNT(*) FROM V$SESSION WHERE BLOCKING_SESSION IS NOT NULL"
+      SELECT ROUND((1 - (disk_reads.value / NULLIF(buffer_gets.value + buffer_cr_gets.value, 0))) * 100, 2) AS buffer_cache_hit_ratio
+      FROM 
+          (SELECT value FROM V$SYSSTAT WHERE name = 'DISK READS') disk_reads,
+          (SELECT value FROM V$SYSSTAT WHERE name = 'BUFFER GETS') buffer_gets,
+          (SELECT value FROM V$SYSSTAT WHERE name = 'BUFFER CR GETS') buffer_cr_gets
+  - lock_waits: "SELECT COUNT(*) FROM V$LOCK WHERE REQUEST IS NOT NULL"
 hostMetrics:
   - sql: "SELECT STAT_NAME, VALUE FROM V$OSSTAT WHERE STAT_NAME IN ('NUM_CPUS', 'PHYSICAL_MEMORY_BYTES', 'FREE_MEMORY_BYTES')"
     map:
