@@ -2,6 +2,7 @@ package com.ninedata.dbbench.database.plugin;
 
 import com.ninedata.dbbench.config.DatabaseConfig;
 import com.ninedata.dbbench.database.AbstractDatabaseAdapter;
+import com.zaxxer.hikari.HikariConfig;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -66,21 +67,15 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
     @Override
     public void initialize() throws SQLException {
         super.initialize();
+    }
+
+    @Override
+    protected void configureHikari(HikariConfig hikariConfig) {
         List<String> initStmts = definition.getInit();
         if (initStmts != null && !initStmts.isEmpty()) {
-            try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-                boolean origAutoCommit = conn.getAutoCommit();
-                conn.setAutoCommit(true);
-                for (String sql : initStmts) {
-                    try {
-                        stmt.execute(sql);
-                    } catch (SQLException e) {
-                        log.warn("Init statement failed for {} (may need privileges): {}", definition.getName(), e.getMessage());
-                    }
-                }
-                conn.setAutoCommit(origAutoCommit);
-                log.info("Executed {} init statements for {}", initStmts.size(), definition.getName());
-            }
+            String combined = String.join("; ", initStmts);
+            hikariConfig.setConnectionInitSql(combined);
+            log.info("Set connectionInitSql for {}: {}", definition.getName(), combined);
         }
     }
 
@@ -173,6 +168,7 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
                 ps.addBatch();
                 if (++count % batchSize == 0) {
                     ps.executeBatch();
+                    conn.commit();
                 }
             }
             if (count % batchSize != 0) {
@@ -180,7 +176,7 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
             }
             conn.commit();
             log.info("Batch-inserted {} rows into {}", count, tableName);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new SQLException("Failed to read CSV file: " + csvFilePath, e);
         }
     }

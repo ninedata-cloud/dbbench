@@ -39,6 +39,8 @@ public abstract class AbstractDatabaseAdapter implements DatabaseAdapter {
             log.warn("Could not set driver class: {}", e.getMessage());
         }
 
+        configureHikari(hikariConfig);
+
         this.dataSource = new HikariDataSource(hikariConfig);
         log.info("Database connection pool initialized for {}", getDatabaseType());
     }
@@ -112,6 +114,10 @@ public abstract class AbstractDatabaseAdapter implements DatabaseAdapter {
     @Override
     public Map<String, Object> collectMetrics() throws SQLException {
         return new HashMap<>();
+    }
+
+    protected void configureHikari(HikariConfig hikariConfig) {
+        // Subclasses can override to customize HikariCP settings
     }
 
     protected abstract String[] getCreateTableStatements();

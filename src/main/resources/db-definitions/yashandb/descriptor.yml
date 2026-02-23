@@ -8,7 +8,7 @@ validation: "SELECT 1 FROM DUAL"
 noLimit: true
 dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
 init:
-  - "ALTER SESSION SET DATE_FORMAT= = 'YYYY-MM-DD HH24:MI:SS'"
+  - "ALTER SESSION SET DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
 metrics:
   - active_connections: "SELECT COUNT(*) FROM V$SESSION WHERE STATUS = 'ACTIVE'"
   - buffer_pool_hit_ratio: >
