@@ -1,4 +1,4 @@
-name: OceanBase
+name: OceanBase(MySQL)
 type: oceanbase
 driver: com.oceanbase.jdbc.Driver
 url: "jdbc:oceanbase://{host}:{port}/{database}"
