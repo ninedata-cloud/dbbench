@@ -331,7 +331,6 @@ public class BenchmarkEngine {
 
                 TPCCLoader loader = new TPCCLoader(adapter, benchConfig.getWarehouses(), benchConfig.getLoadConcurrency(), benchConfig.getLoadMode());
                 currentLoader = loader;
-                loader.setProgressCallback(msg -> addLog("INFO", msg));
                 loader.setStructuredProgressCallback((pct, msg) -> {
                     addLog("INFO", msg);
                     broadcastLoadProgress(pct, msg);
@@ -560,10 +559,22 @@ public class BenchmarkEngine {
                     } catch (Exception e) {
                         // Connection may be broken, try reconnect
                         log.warn("Terminal {} transaction error, reconnecting: {}", terminalId, e.getMessage());
-                        try {
-                            ctx.reconnect();
-                        } catch (SQLException re) {
-                            log.error("Terminal {} reconnect failed: {}", terminalId, re.getMessage());
+                        boolean reconnected = false;
+                        for (int attempt = 1; attempt <= 3 && running.get(); attempt++) {
+                            try {
+                                Thread.sleep(1000L * attempt);
+                                ctx.reconnect();
+                                reconnected = true;
+                                break;
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            } catch (SQLException re) {
+                                log.warn("Terminal {} reconnect attempt {}/3 failed: {}", terminalId, attempt, re.getMessage());
+                            }
+                        }
+                        if (!reconnected) {
+                            log.error("Terminal {} giving up after 3 reconnect attempts", terminalId);
                             break;
                         }
                         continue;
@@ -653,10 +664,14 @@ public class BenchmarkEngine {
         }
 
         if (executorService != null) {
-            executorService.shutdownNow();
+            executorService.shutdown();
             try {
-                executorService.awaitTermination(5, TimeUnit.SECONDS);
+                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                    executorService.awaitTermination(5, TimeUnit.SECONDS);
+                }
             } catch (InterruptedException e) {
+                executorService.shutdownNow();
                 Thread.currentThread().interrupt();
             }
         }

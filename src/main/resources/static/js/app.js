@@ -5,7 +5,7 @@
 
 // Global state
 let ws = null;
-let tpsChart = null;
+let tpmcChart = null;
 let cpuChart = null;
 let networkChart = null;
 let dbCpuChart = null;
@@ -15,7 +15,7 @@ let dbNetChart = null;
 let dbConnChart = null;
 let chartTimeRange = 'all';
 const chartDataBuffer = {
-    tps:     { labels: [], timestamps: [], data: [] },
+    tpmc:     { labels: [], timestamps: [], data: [] },
     cpu:     { labels: [], timestamps: [], data: [] },
     network: { labels: [], timestamps: [], recvData: [], sentData: [] },
     dbCpu:   { labels: [], timestamps: [], data: [] },
@@ -125,9 +125,9 @@ async function restoreChartHistory() {
                 const host = snapshot.dbHostMetrics || {};
 
                 // TPS
-                chartDataBuffer.tps.labels.push(time);
-                chartDataBuffer.tps.timestamps.push(ts);
-                chartDataBuffer.tps.data.push(tx.tps || 0);
+                chartDataBuffer.tpmc.labels.push(time);
+                chartDataBuffer.tpmc.timestamps.push(ts);
+                chartDataBuffer.tpmc.data.push(tx.nopm || 0);
 
                 // Client CPU
                 chartDataBuffer.cpu.labels.push(time);
@@ -217,14 +217,14 @@ function startStatusPolling() {
 // ==================== Charts ====================
 
 function initCharts() {
-    // TPS Chart
-    const tpsCtx = document.getElementById('tpsChart').getContext('2d');
-    tpsChart = new Chart(tpsCtx, {
+    // tpmcChart
+    const tpmcCtx = document.getElementById('tpmcChart').getContext('2d');
+    tpmcChart = new Chart(tpmcCtx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [{
-                label: 'TPS',
+                label: 'tpmC',
                 data: [],
                 borderColor: '#00d9ff',
                 backgroundColor: 'rgba(0, 217, 255, 0.1)',
@@ -606,9 +606,8 @@ function handleWebSocketMessage(data) {
 function updateMetrics(data) {
     if (data.transaction) {
         const tx = data.transaction;
-        document.getElementById('tps').textContent = Math.round(tx.tps || 0);
+        document.getElementById('tpmc').textContent = Math.round(tx.nopm || 0);
         document.getElementById('tpm').textContent = Math.round(tx.tpm || 0);
-        document.getElementById('newOrderTpm').textContent = Math.round(tx.nopm || tx.newOrderTpm || 0);
         document.getElementById('newOrderLatency').textContent = (tx.newOrderAvgLatencyMs?.toFixed(2) || '0.00') + ' ms';
         document.getElementById('totalTx').textContent = tx.totalTransactions || 0;
         document.getElementById('successRate').textContent = (tx.overallSuccessRate || 0).toFixed(1) + '%';
@@ -616,13 +615,13 @@ function updateMetrics(data) {
         document.getElementById('elapsed').textContent = (tx.elapsedSeconds || 0) + 's';
 
         // Update chart - only when benchmark is running
-        if (data.status === 'RUNNING' && tx.tps !== undefined) {
+        if (data.status === 'RUNNING' && tx.nopm !== undefined) {
             const now = new Date().toLocaleTimeString();
             const ts = Date.now();
-            chartDataBuffer.tps.labels.push(now);
-            chartDataBuffer.tps.timestamps.push(ts);
-            chartDataBuffer.tps.data.push(tx.tps || 0);
-            applyTimeRangeToChart('tps');
+            chartDataBuffer.tpmc.labels.push(now);
+            chartDataBuffer.tpmc.timestamps.push(ts);
+            chartDataBuffer.tpmc.data.push(tx.nopm || 0);
+            applyTimeRangeToChart('tpmc');
         }
 
         // Update transaction table
@@ -1274,9 +1273,9 @@ function startBenchmark() {
 
 async function doStartBenchmark() {
     // Clear TPS chart data for new run
-    tpsChart.data.labels = [];
-    tpsChart.data.datasets[0].data = [];
-    tpsChart.update();
+    tpmcChart.data.labels = [];
+    tpmcChart.data.datasets[0].data = [];
+    tpmcChart.update();
 
     // Clear database charts for new run
     dbCpuChart.data.labels = [];
@@ -1333,7 +1332,7 @@ async function doStopBenchmark() {
 
 function getChartAndKeys(key) {
     switch (key) {
-        case 'tps':     return { chart: tpsChart, dataKeys: ['data'] };
+        case 'tpmc':     return { chart: tpmcChart, dataKeys: ['data'] };
         case 'cpu':     return { chart: cpuChart, dataKeys: ['data'] };
         case 'network': return { chart: networkChart, dataKeys: ['recvData', 'sentData'] };
         case 'dbCpu':   return { chart: dbCpuChart, dataKeys: ['data'] };

@@ -10,7 +10,7 @@ dropStatement: "DROP TABLE ${tableName} CASCADE CONSTRAINTS"
 init:
   - "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
 metrics:
-  - buffer_pool_hit_ratio: "SELECT RATIODBCR FROM V$BUFFERPOOL"
+  - buffer_pool_hit_ratio: "SELECT ROUND(SUM(N_LOGIC_READS-RAT_HIT/100*N_LOGIC_READS)/sum(N_LOGIC_READS)* 100, 2) as hit FROM V$BUFFERPOOL"
   - active_connections: "SELECT COUNT(*) FROM V$SESSIONS WHERE STATE = 'ACTIVE'"
   - lock_waits: "SELECT COUNT(*) FROM V$LOCK WHERE BLOCKED = 1"
 hostMetrics:

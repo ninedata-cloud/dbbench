@@ -248,6 +248,7 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
                 }
             }
             for (var cm : computed) {
+                log.debug("Computing {}: expr={}, vars={}", cm.getMetric(), cm.getExpression(), vars);
                 double val = ExpressionEvaluator.evaluate(cm.getExpression(), vars);
                 val = Math.round(val * 100.0) / 100.0;
                 metrics.put(cm.getMetric(), val);

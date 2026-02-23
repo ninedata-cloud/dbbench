@@ -35,7 +35,8 @@
       "WebFetch(domain:zedware.github.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "WebFetch(domain:docs.pingcap.com)"
     ]
   }
 }

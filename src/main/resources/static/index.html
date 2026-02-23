@@ -47,7 +47,7 @@
                 </svg>
                 Report
             </button>
-            <span class="status status-idle" id="status">IDLE</span>
+            <span class="status status-idle" id="status" style="margin-left: auto">IDLE</span>
         </div>
 
         <!-- Main Grid -->
@@ -103,20 +103,12 @@
             <div class="card">
                 <h3>Performance Summary</h3>
                 <div class="metric">
-                    <span class="metric-label">Throughput (TPS)</span>
-                    <span class="metric-value highlight" id="tps">0.00</span>
+                    <span class="metric-label">tpmC/NOPM(New Order Per Minute)</span>
+                    <span class="metric-value highlight" id="tpmc">0.00</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Throughput (TPM)</span>
+                    <span class="metric-label">TPM(Transaction Per Minute)</span>
                     <span class="metric-value highlight" id="tpm">0.00</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">NOPM (tpmC)</span>
-                    <span class="metric-value highlight" id="newOrderTpm">0.00</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">New Order Avg Latency</span>
-                    <span class="metric-value" id="newOrderLatency">0 ms</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Total Transactions</span>
@@ -125,6 +117,10 @@
                 <div class="metric">
                     <span class="metric-label">Success Rate</span>
                     <span class="metric-value" id="successRate">0%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">New Order Avg Latency</span>
+                    <span class="metric-value" id="newOrderLatency">0 ms</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Avg Latency</span>
@@ -138,18 +134,7 @@
 
             <!-- Database Metrics -->
             <div class="card">
-                <h3>Database Metrics</h3>
-                <div class="hw-info-section" id="dbHwInfo">
-                    <div class="hw-info-toggle" onclick="toggleHwInfo('dbHwInfo')">Server Hardware Info <span class="hw-info-arrow">&#9654;</span></div>
-                    <div class="hw-info-grid" style="display:none;">
-                        <div class="hw-info-item"><span class="hw-info-label">OS</span><span class="hw-info-value" id="dbHwOs">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">CPU</span><span class="hw-info-value" id="dbHwCpu">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Cores</span><span class="hw-info-value" id="dbHwCores">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Memory</span><span class="hw-info-value" id="dbHwMemory">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Disk</span><span class="hw-info-value" id="dbHwDisk">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Network</span><span class="hw-info-value" id="dbHwNetwork">-</span></div>
-                    </div>
-                </div>
+                <h3>Database Server Metrics</h3>
                 <div class="metric">
                     <span class="metric-label">CPU Usage</span>
                     <span class="metric-value" id="dbCpuUsage">-</span>
@@ -170,21 +155,21 @@
                     <span class="metric-label">Active Connections</span>
                     <span class="metric-value" id="dbConnections">0</span>
                 </div>
+                <div class="hw-info-section" id="dbHwInfo">
+                    <div class="hw-info-toggle" onclick="toggleHwInfo('dbHwInfo')">Server Hardware Info <span class="hw-info-arrow">&#9654;</span></div>
+                    <div class="hw-info-grid" style="display:none;">
+                        <div class="hw-info-item"><span class="hw-info-label">OS</span><span class="hw-info-value" id="dbHwOs">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">CPU</span><span class="hw-info-value" id="dbHwCpu">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Cores</span><span class="hw-info-value" id="dbHwCores">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Memory</span><span class="hw-info-value" id="dbHwMemory">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Disk</span><span class="hw-info-value" id="dbHwDisk">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Network</span><span class="hw-info-value" id="dbHwNetwork">-</span></div>
+                    </div>
+                </div>
             </div>
             <!-- System Resources -->
             <div class="card">
                 <h3>Client Metrics</h3>
-                <div class="hw-info-section" id="clientHwInfo">
-                    <div class="hw-info-toggle" onclick="toggleHwInfo('clientHwInfo')">Client Hardware Info <span class="hw-info-arrow">&#9654;</span></div>
-                    <div class="hw-info-grid" style="display:none;">
-                        <div class="hw-info-item"><span class="hw-info-label">OS</span><span class="hw-info-value" id="clientHwOs">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">CPU</span><span class="hw-info-value" id="clientHwCpu">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Cores</span><span class="hw-info-value" id="clientHwCores">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Memory</span><span class="hw-info-value" id="clientHwMemory">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Disk</span><span class="hw-info-value" id="clientHwDisk">-</span></div>
-                        <div class="hw-info-item"><span class="hw-info-label">Network</span><span class="hw-info-value" id="clientHwNetwork">-</span></div>
-                    </div>
-                </div>
                 <div class="metric">
                     <span class="metric-label">Client CPU Usage</span>
                     <span class="metric-value" id="cpuUsage">0%</span>
@@ -198,6 +183,17 @@
                 <div class="metric" style="margin-top: 15px;">
                     <span class="metric-label">Client Load Average (1m)</span>
                     <span class="metric-value" id="loadAvg">0.00</span>
+                </div>
+                <div class="hw-info-section" id="clientHwInfo">
+                    <div class="hw-info-toggle" onclick="toggleHwInfo('clientHwInfo')">Client Hardware Info <span class="hw-info-arrow">&#9654;</span></div>
+                    <div class="hw-info-grid" style="display:none;">
+                        <div class="hw-info-item"><span class="hw-info-label">OS</span><span class="hw-info-value" id="clientHwOs">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">CPU</span><span class="hw-info-value" id="clientHwCpu">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Cores</span><span class="hw-info-value" id="clientHwCores">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Memory</span><span class="hw-info-value" id="clientHwMemory">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Disk</span><span class="hw-info-value" id="clientHwDisk">-</span></div>
+                        <div class="hw-info-item"><span class="hw-info-label">Network</span><span class="hw-info-value" id="clientHwNetwork">-</span></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -220,6 +216,15 @@
             </div>
         </div>
 
+        <!-- tpmC Chart -->
+        <div class="grid">
+            <div class="card card-full">
+                <h3>tpmC/NOPM(New Order Per Minute)</h3>
+                <div class="chart-container">
+                    <canvas id="tpmcChart"></canvas>
+                </div>
+            </div>
+        </div>
         <!-- Database Host Metrics Charts - Row 1: CPU, Memory, Disk I/O -->
         <div class="grid grid-3">
             <div class="card">
@@ -258,15 +263,6 @@
             </div>
         </div>
 
-        <!-- TPS Chart -->
-        <div class="grid">
-            <div class="card card-full">
-                <h3>Throughput（TPS）</h3>
-                <div class="chart-container">
-                    <canvas id="tpsChart"></canvas>
-                </div>
-            </div>
-        </div>
 
         <!-- CPU and Network Charts -->
         <div class="grid grid-2">

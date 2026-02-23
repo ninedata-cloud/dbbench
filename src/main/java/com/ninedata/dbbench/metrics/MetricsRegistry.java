@@ -102,7 +102,7 @@ public class MetricsRegistry {
 
         // Elapsed time from recording start (measurement period only)
         long measureStart = recordingStartTime > 0 ? recordingStartTime : startTime;
-        long elapsed = (endTime > 0 ? endTime : System.currentTimeMillis()) - measureStart;
+        long elapsed = measureStart > 0 ? (endTime > 0 ? endTime : System.currentTimeMillis()) - measureStart : 0;
         result.put("elapsedSeconds", elapsed / 1000);
         double tps = elapsed > 0 ? totalCount * 1000.0 / elapsed : 0;
         result.put("tps", Math.round(tps));

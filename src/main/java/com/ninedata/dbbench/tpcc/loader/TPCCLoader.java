@@ -100,7 +100,9 @@ public class TPCCLoader {
 
     private void reportProgress(String message) {
         log.info(message);
-        if (progressCallback != null) {
+        if (structuredProgressCallback != null) {
+            structuredProgressCallback.accept(-1, message);
+        } else if (progressCallback != null) {
             progressCallback.accept(message);
         }
     }
@@ -109,8 +111,7 @@ public class TPCCLoader {
         log.info("[{}%] {}", percent, message);
         if (structuredProgressCallback != null) {
             structuredProgressCallback.accept(percent, message);
-        }
-        if (progressCallback != null) {
+        } else if (progressCallback != null) {
             progressCallback.accept(message);
         }
     }
