@@ -47,70 +47,25 @@
 #### Configuration Panel
 ![Configuration](src/main/resources/static/img/config1.jpg)
 
-## Quick Start
+## Docker Quick Start (Recommended) 
+```bash
+docker run -d -p 1929:1929 --name dbbench yzsind/dbbench:latest
+```
 
+Open http://localhost:1929 in your browser to start testing.
+
+
+## Build from Source
 ### Prerequisites
 
 - Java 17+ (or Docker)
 - Maven 3.6+ (for building from source)
 - Target database with an empty database created
 
-### Docker Quick Start (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/yzsind/dbbench.git
-cd dbbench
-
-# Build and run
-docker build -t dbbench:latest .
-docker run -d -p 1929:1929 \
-  -e DB_TYPE=mysql \
-  -e DB_JDBC_URL="jdbc:mysql://host.docker.internal:3306/tpcc?useSSL=false&rewriteBatchedStatements=true" \
-  -e DB_USERNAME=root \
-  -e DB_PASSWORD=password \
-  --name dbbench dbbench:latest
-```
-
-Open http://localhost:1929 in your browser. Configure the database connection in the web UI, click "Load Data" to generate test data, then "Start" to run the benchmark.
-
-### Connect to Other Databases
-
-```bash
-docker run -d -p 1929:1929 \
-  -e DB_TYPE=postgresql \
-  -e DB_JDBC_URL="jdbc:postgresql://host.docker.internal:5432/tpcc" \
-  -e DB_USERNAME=postgres \
-  -e DB_PASSWORD=password \
-  --name dbbench dbbench:latest
-```
-
-### Build from Source
-
 ```bash
 git clone https://github.com/yzsind/dbbench.git
 cd dbbench
 mvn clean package -DskipTests
-```
-
-### Proprietary JDBC Drivers
-
-Some databases require proprietary JDBC drivers that are not available in Maven Central. These are declared with `provided` scope and must be supplied at runtime:
-
-| Database | Driver JAR | How to Obtain |
-|----------|-----------|---------------|
-| SAP HANA | `ngdbc-*.jar` | [SAP Development Tools](https://tools.hana.ondemand.com/#hanatools) |
-
-Place the driver JAR in the classpath when running:
-
-```bash
-java -cp "target/dbbench-0.8.0.jar:drivers/*" com.ninedata.dbbench.DBBenchApplication
-```
-
-Or install to your local Maven repository:
-
-```bash
-mvn install:install-file -Dfile=ngdbc.jar -DgroupId=com.sap.cloud.db.jdbc -DartifactId=ngdbc -Dversion=2.20.11 -Dpackaging=jar
 ```
 
 ### Web Mode
@@ -127,7 +82,7 @@ From the web dashboard you can:
 1. Configure database connection and test it
 2. Load TPC-C test data
 3. Start/Stop benchmark
-4. Monitor real-time metrics (TPS, CPU, Network, etc.)
+4. Monitor real-time metrics (tpmC, CPU, Network, etc.)
 5. View detailed logs
 
 ### CLI Mode
@@ -241,7 +196,7 @@ All configuration can be overridden via environment variables:
 | `/api/benchmark/logs` | GET | Get activity logs |
 | `/api/metrics/current` | GET | Get current metrics |
 | `/api/metrics/history` | GET | Get metrics history (default: up to 3600 snapshots) |
-| `/api/metrics/tps-history` | GET | Get TPS history (default: up to 3600 snapshots) |
+| `/api/metrics/tps-history` | GET | Get tpmC history (default: up to 3600 snapshots) |
 | `/api/metrics/hardware-info` | GET | Get client and DB server hardware info |
 | `/api/report/markdown` | GET | Get benchmark report in Markdown |
 | `/api/report/download/markdown` | GET | Download benchmark report as .md file |
@@ -269,7 +224,7 @@ Message types:
 ## Metrics Collected
 
 ### Transaction Metrics
-- Throughput (TPS)
+- Throughput (tpmC)
 - Total transactions count
 - Success/Failure counts and rates
 - Latency (average, min, max)
@@ -319,12 +274,12 @@ Per warehouse (approximately):
 ### Web Dashboard
 The web dashboard provides real-time monitoring with:
 - Configuration panel with connection testing
-- Performance summary (TPS, TPM, tpmC, latency, success rate)
+- Performance summary (tpmC, TPM, latency, success rate)
 - Time range selector (All / 1m / 10m / 1h / 6h / 1day / Custom) for chart zoom
 - Smart downsampling for smooth chart rendering at any time scale
 - Database host metrics (CPU, Memory, Disk I/O, Network I/O, Connections)
 - Client metrics (CPU, Memory, Network I/O)
-- TPS chart over time
+- tpmC chart over time
 - Transaction breakdown table with Rollback/Error split
 - Activity logs
 - Benchmark report generation (Markdown / PDF)
