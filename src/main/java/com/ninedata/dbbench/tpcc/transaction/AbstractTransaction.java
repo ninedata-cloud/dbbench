@@ -101,6 +101,8 @@ public abstract class AbstractTransaction {
         String dbType = adapter.getDatabaseType().toLowerCase();
         if (dbType.contains("sql server")) {
             return baseQuery.replaceFirst("(?i)SELECT\\s+", "SELECT TOP 1 ");
+        } else if (dbType.contains("gbase") || dbType.contains("informix")) {
+            return baseQuery.replaceFirst("(?i)SELECT\\s+", "SELECT FIRST 1 ");
         } else if (useLimitSyntax) {
             return baseQuery + " LIMIT 1";
         } else if (dbType.contains("oracle")) {

@@ -36,7 +36,11 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "Bash(gh api:*)",
-      "WebFetch(domain:docs.pingcap.com)"
+      "WebFetch(domain:docs.pingcap.com)",
+      "WebFetch(domain:wiki.scn.sap.com)",
+      "WebFetch(domain:psapps-pswiki.cfapps.sap.hana.ondemand.com)",
+      "WebFetch(domain:www.ibm.com)",
+      "Bash(git status:*)"
     ]
   }
 }

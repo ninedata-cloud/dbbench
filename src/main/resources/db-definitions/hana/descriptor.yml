@@ -17,12 +17,12 @@ metrics:
   - plan_cache_hit_ratio: "SELECT PLAN_CACHE_HIT_RATIO FROM M_SQL_PLAN_CACHE_OVERVIEW"
 hostMetrics:
   - sql: >
-      SELECT TOTAL_CPU_USER_TIME as cpuUser, TOTAL_CPU_SYSTEM_TIME as cpuSys,
-      TOTAL_CPU_IDLE_TIME as cpuIdle,
-      USED_PHYSICAL_MEMORY as memUsedBytes, FREE_PHYSICAL_MEMORY as memFreeBytes
+      SELECT TOTAL_CPU_USER_TIME as "cpuUserTime", TOTAL_CPU_SYSTEM_TIME as "cpuSysTime",
+      TOTAL_CPU_IDLE_TIME as "cpuIdleTime",
+      USED_PHYSICAL_MEMORY as "memUsedBytes", FREE_PHYSICAL_MEMORY as "memFreeBytes"
       FROM M_HOST_RESOURCE_UTILIZATION
   - sql: >
-      SELECT SUM(TOTAL_READ_SIZE) as diskReadBytes, SUM(TOTAL_WRITE_SIZE) as diskWriteBytes
+      SELECT SUM(TOTAL_READ_SIZE) as "diskReadBytes", SUM(TOTAL_WRITE_SIZE) as "diskWriteBytes"
       FROM M_VOLUME_IO_TOTAL_STATISTICS
-  - cpuUsage: "((cpuUser + cpuSys) / (cpuUser + cpuSys + cpuIdle)) * 100"
-    computed: true
+  - sql: >
+      SELECT SEND_SIZE*1000 as "networkSentBytes",RECEIVE_SIZE*1000 as "networkRecvBytes" FROM M_SERVICE_NETWORK_IO

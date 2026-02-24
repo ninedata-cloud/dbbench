@@ -51,16 +51,6 @@ public class ReportGenerator {
         Map<String, Object> client = (Map<String, Object>) hwInfo.getOrDefault("client", Collections.emptyMap());
         Map<String, Object> dbServer = (Map<String, Object>) hwInfo.getOrDefault("dbServer", Collections.emptyMap());
 
-        sb.append("### Client\n\n");
-        sb.append("| Item | Value |\n|------|-------|\n");
-        appendHwRow(sb, client, "OS", "os");
-        appendHwRow(sb, client, "CPU", "cpu");
-        appendHwCores(sb, client);
-        appendHwMemory(sb, client);
-        appendHwRow(sb, client, "Disk", "disks");
-        appendHwRow(sb, client, "Network", "network");
-        sb.append("\n");
-
         if (!dbServer.isEmpty()) {
             sb.append("### Database Server\n\n");
             sb.append("| Item | Value |\n|------|-------|\n");
@@ -72,6 +62,16 @@ public class ReportGenerator {
             appendHwRow(sb, dbServer, "Network", "network");
             sb.append("\n");
         }
+
+        sb.append("### Client\n\n");
+        sb.append("| Item | Value |\n|------|-------|\n");
+        appendHwRow(sb, client, "OS", "os");
+        appendHwRow(sb, client, "CPU", "cpu");
+        appendHwCores(sb, client);
+        appendHwMemory(sb, client);
+        appendHwRow(sb, client, "Disk", "disks");
+        appendHwRow(sb, client, "Network", "network");
+        sb.append("\n");
     }
 
     private void appendHwRow(StringBuilder sb, Map<String, Object> hw, String label, String key) {
@@ -136,7 +136,6 @@ public class ReportGenerator {
         sb.append("| Metric | Value |\n|--------|-------|\n");
         sb.append("| NOPM (New Orders Per Minute) | ").append(metrics.getOrDefault("nopm", 0)).append(" |\n");
         sb.append("| Total Transactions | ").append(metrics.getOrDefault("totalTransactions", 0)).append(" |\n");
-        sb.append("| TPS | ").append(metrics.getOrDefault("tps", 0)).append(" |\n");
         sb.append("| TPM | ").append(metrics.getOrDefault("tpm", 0)).append(" |\n");
         sb.append("| New Order TPM (tpmC) | ").append(metrics.getOrDefault("newOrderTpm", 0)).append(" |\n");
         sb.append("| New Order Count | ").append(metrics.getOrDefault("newOrderCount", 0)).append(" |\n");
@@ -180,46 +179,28 @@ public class ReportGenerator {
             sb.append("No historical data available.\n\n");
             return;
         }
-        double maxTps = 0, minTps = Double.MAX_VALUE, sumTps = 0;
         double maxNoTpm = 0, minNoTpm = Double.MAX_VALUE, sumNoTpm = 0;
         int count = 0;
-        int noCount = 0;
         for (MetricsSnapshot snap : history) {
             Map<String, Object> tx = snap.getTransactionMetrics();
             if (tx == null) continue;
-            Object tpsObj = tx.get("tps");
-            if (tpsObj instanceof Number) {
-                double tps = ((Number) tpsObj).doubleValue();
-                maxTps = Math.max(maxTps, tps);
-                minTps = Math.min(minTps, tps);
-                sumTps += tps;
-                count++;
-            }
             Object noTpmObj = tx.get("newOrderTpm");
             if (noTpmObj instanceof Number) {
                 double tpm = ((Number) noTpmObj).doubleValue();
                 maxNoTpm = Math.max(maxNoTpm, tpm);
                 minNoTpm = Math.min(minNoTpm, tpm);
                 sumNoTpm += tpm;
-                noCount++;
+                count++;
             }
         }
         if (count == 0) {
-            sb.append("No TPS data available.\n\n");
+            sb.append("No performance data available.\n\n");
             return;
         }
         sb.append("| Metric | Average | Peak | Minimum |\n|--------|---------|------|---------|\n");
-        sb.append("| TPS | ").append(Math.round(sumTps / count));
-        sb.append(" | ").append(Math.round(maxTps));
-        sb.append(" | ").append(Math.round(minTps)).append(" |\n");
-        sb.append("| TPM | ").append(Math.round(sumTps / count * 60));
-        sb.append(" | ").append(Math.round(maxTps * 60));
-        sb.append(" | ").append(Math.round(minTps * 60)).append(" |\n");
-        if (noCount > 0) {
-            sb.append("| New Order TPM | ").append(Math.round(sumNoTpm / noCount));
-            sb.append(" | ").append(Math.round(maxNoTpm));
-            sb.append(" | ").append(Math.round(minNoTpm)).append(" |\n");
-        }
+        sb.append("| NOPM (tpmC) | ").append(Math.round(sumNoTpm / count));
+        sb.append(" | ").append(Math.round(maxNoTpm));
+        sb.append(" | ").append(Math.round(minNoTpm)).append(" |\n");
         sb.append("| Data Points | ").append(count).append(" | | |\n\n");
     }
 
@@ -288,26 +269,6 @@ public class ReportGenerator {
         sb.append("- **Success Rate:** ").append(metrics.getOrDefault("overallSuccessRate", 0)).append("%\n");
         sb.append("- **Average Latency:** ").append(metrics.getOrDefault("avgLatencyMs", 0)).append("ms\n");
 
-        if (!history.isEmpty()) {
-            double sumTps = 0;
-            double maxTps = 0;
-            int count = 0;
-            for (MetricsSnapshot snap : history) {
-                Map<String, Object> tx = snap.getTransactionMetrics();
-                if (tx == null) continue;
-                Object tpsObj = tx.get("tps");
-                if (tpsObj instanceof Number) {
-                    double tps = ((Number) tpsObj).doubleValue();
-                    maxTps = Math.max(maxTps, tps);
-                    sumTps += tps;
-                    count++;
-                }
-            }
-            if (count > 0) {
-                sb.append("- **Average TPS:** ").append(Math.round(sumTps / count)).append("\n");
-                sb.append("- **Peak TPS:** ").append(Math.round(maxTps)).append("\n");
-            }
-        }
         sb.append("\n---\n*Report generated by NineData DBBench*\n");
     }
 
@@ -317,7 +278,6 @@ public class ReportGenerator {
         sb.append("## Monitoring Charts\n\n");
 
         // Collect data series from history
-        List<Double> tpsList = new ArrayList<>();
         List<Double> noTpmList = new ArrayList<>();
         List<Double> latencyList = new ArrayList<>();
         List<Double> clientCpuList = new ArrayList<>();
@@ -326,7 +286,6 @@ public class ReportGenerator {
         for (MetricsSnapshot snap : history) {
             Map<String, Object> tx = snap.getTransactionMetrics();
             if (tx != null) {
-                tpsList.add(getDouble(tx, "tps"));
                 noTpmList.add(getDouble(tx, "newOrderTpm"));
                 latencyList.add(getDouble(tx, "avgLatencyMs"));
             }
@@ -336,10 +295,7 @@ public class ReportGenerator {
             dbCpuList.add(hm != null && !hm.isEmpty() ? getDouble(hm, "cpuUsage") : -1);
         }
 
-        sb.append("### TPS\n\n");
-        appendSvgChart(sb, tpsList, "#00b8d9", "TPS");
-
-        sb.append("### New Order TPM (tpmC)\n\n");
+        sb.append("### NOPM / tpmC\n\n");
         appendSvgChart(sb, noTpmList, "#2ecc71", "tpmC");
 
         sb.append("### Average Latency (ms)\n\n");

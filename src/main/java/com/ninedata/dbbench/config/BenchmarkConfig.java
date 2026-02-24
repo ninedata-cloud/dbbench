@@ -20,6 +20,7 @@ public class BenchmarkConfig {
      * Data loading mode: "auto" (default) uses CSV if DB supports it, "csv" forces CSV, "batch" forces INSERT batch.
      */
     private String loadMode = "auto";
+    private long metricsInterval = 5000;
     private MixConfig mix = new MixConfig();
 
     @Data

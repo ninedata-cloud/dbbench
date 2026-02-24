@@ -45,3 +45,4 @@ surefire-reports/
 application-local.properties
 *.env
 profiles/
+/profiles/

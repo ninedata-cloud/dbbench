@@ -74,21 +74,21 @@ docker run -d -p 1929:1929 \
 
 ## 支持的数据库
 
-| 数据库 | JDBC URL 格式 |
-|--------|---------------|
-| MySQL | `jdbc:mysql://host:3306/database` |
-| PostgreSQL | `jdbc:postgresql://host:5432/database` |
-| Oracle | `jdbc:oracle:thin:@host:1521:sid` |
-| SQL Server | `jdbc:sqlserver://host:1433;databaseName=db` |
-| DB2 | `jdbc:db2://host:50000/database` |
-| TiDB | `jdbc:mysql://host:4000/database` |
-| OceanBase | `jdbc:oceanbase://host:2881/database` |
-| 达梦 | `jdbc:dm://host:5236/database` |
-| SQLite | `jdbc:sqlite:./tpcc.db` |
-| YashanDB | `jdbc:yasdb://host:1688/database` |
+| 数据库 | JDBC URL 格式                                                     |
+|--------|-----------------------------------------------------------------|
+| MySQL | `jdbc:mysql://host:3306/database`                               |
+| PostgreSQL | `jdbc:postgresql://host:5432/database`                          |
+| Oracle | `jdbc:oracle:thin:@host:1521:sid`                               |
+| SQL Server | `jdbc:sqlserver://host:1433;databaseName=db`                    |
+| DB2 | `jdbc:db2://host:50000/database`                                |
+| TiDB | `jdbc:mysql://host:4000/database`                               |
+| OceanBase | `jdbc:oceanbase://host:2881/database`                           |
+| 达梦 | `jdbc:dm://host:5236/database`                                  |
+| SQLite | `jdbc:sqlite:./tpcc.db`                                         |
+| YashanDB | `jdbc:yasdb://host:1688/database`                               |
 | GBase8s | `jdbc:gbasedbt-sqli://host:9088/database:GBASEDBTSERVER=server` |
-| Sybase | `jdbc:sybase:Tds:host:5000/database` |
-| SAP HANA | `jdbc:sap://host:30015/?databaseName=database` |
+| Sybase | `jdbc:sybase:Tds:host:5000/database`                            |
+| SAP HANA | `jdbc:sap://host:30015/?currentschema=schemaName`               |
 
 ## 使用流程
 

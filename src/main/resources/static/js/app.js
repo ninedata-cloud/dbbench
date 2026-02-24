@@ -30,14 +30,6 @@ let savedSshPassword = '';
 let allLogs = [];
 let statusPollInterval = null;
 let lastStatus = null;
-// For calculating disk I/O rate
-let lastDiskReadBytes = 0;
-let lastDiskWriteBytes = 0;
-let lastDiskTime = Date.now();
-// For calculating network I/O rate (SQL-sourced cumulative bytes)
-let lastNetRecvBytes = 0;
-let lastNetSentBytes = 0;
-let lastNetTime = Date.now();
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -71,6 +63,11 @@ async function loadInitialState() {
         // Apply config
         currentConfig = config;
         displayConfig(config);
+
+        // Restore form dropdown to match current config (populateDatabaseTypes resets it)
+        if (config.database?.type) {
+            document.getElementById('cfgFormDbType').value = config.database.type;
+        }
 
         // Apply status
         updateStatus(metrics.status);
@@ -717,21 +714,6 @@ function updateMetrics(data) {
             chartDataBuffer.dbDisk.readData.push(hostData.diskReadBytesPerSec);
             chartDataBuffer.dbDisk.writeData.push(hostData.diskWriteBytesPerSec || 0);
             applyTimeRangeToChart('dbDisk');
-        } else if (hostData.diskReadBytes !== undefined && hostData.diskWriteBytes !== undefined) {
-            const currentTime = Date.now();
-            const timeDiff = (currentTime - lastDiskTime) / 1000;
-            if (lastDiskReadBytes > 0 && timeDiff > 0) {
-                const readRate = Math.max(0, (hostData.diskReadBytes - lastDiskReadBytes) / timeDiff);
-                const writeRate = Math.max(0, (hostData.diskWriteBytes - lastDiskWriteBytes) / timeDiff);
-                chartDataBuffer.dbDisk.labels.push(now);
-                chartDataBuffer.dbDisk.timestamps.push(ts);
-                chartDataBuffer.dbDisk.readData.push(readRate);
-                chartDataBuffer.dbDisk.writeData.push(writeRate);
-                applyTimeRangeToChart('dbDisk');
-            }
-            lastDiskReadBytes = hostData.diskReadBytes;
-            lastDiskWriteBytes = hostData.diskWriteBytes;
-            lastDiskTime = currentTime;
         }
 
         // Update Database Metrics panel text fields
@@ -774,21 +756,6 @@ function updateMetrics(data) {
             chartDataBuffer.dbNet.recvData.push(hostData.networkRecvBytesPerSec);
             chartDataBuffer.dbNet.sentData.push(hostData.networkSentBytesPerSec || 0);
             applyTimeRangeToChart('dbNet');
-        } else if (hostData.networkRecvBytes !== undefined && hostData.networkSentBytes !== undefined) {
-            const currentTime = Date.now();
-            const timeDiff = (currentTime - lastNetTime) / 1000;
-            if (lastNetRecvBytes > 0 && timeDiff > 0) {
-                const recvRate = Math.max(0, (hostData.networkRecvBytes - lastNetRecvBytes) / timeDiff);
-                const sentRate = Math.max(0, (hostData.networkSentBytes - lastNetSentBytes) / timeDiff);
-                chartDataBuffer.dbNet.labels.push(now);
-                chartDataBuffer.dbNet.timestamps.push(ts);
-                chartDataBuffer.dbNet.recvData.push(recvRate);
-                chartDataBuffer.dbNet.sentData.push(sentRate);
-                applyTimeRangeToChart('dbNet');
-            }
-            lastNetRecvBytes = hostData.networkRecvBytes;
-            lastNetSentBytes = hostData.networkSentBytes;
-            lastNetTime = currentTime;
         }
     }
 
@@ -1300,15 +1267,6 @@ async function doStartBenchmark() {
     dbConnChart.data.datasets[0].data = [];
     dbConnChart.update();
 
-    // Reset disk I/O tracking
-    lastDiskReadBytes = 0;
-    lastDiskWriteBytes = 0;
-    lastDiskTime = Date.now();
-    // Reset network I/O tracking
-    lastNetRecvBytes = 0;
-    lastNetSentBytes = 0;
-    lastNetTime = Date.now();
-
     addLog('Starting benchmark...', 'info');
     const result = await apiCall('start');
     if (result.success) {
@@ -1605,8 +1563,8 @@ const jdbcUrlTemplates = {
     sqlite: 'jdbc:sqlite:./tpcc.db',
     yashandb: 'jdbc:yasdb://127.0.0.1:1688/tpcc',
     gbase8s: 'jdbc:gbasedbt-sqli://127.0.0.1:9088/tpcc:GBASEDBTSERVER=gbase01',
-    sybase: 'jdbc:sybase:Tds:127.0.0.1:5000/tpcc',
-    hana: 'jdbc:sap://127.0.0.1:30015/?databaseName=tpcc'
+    sybase: 'jdbc:jtds:sybase://127.0.0.1:5000/tpcc',
+    hana: 'jdbc:sap://127.0.0.1:39017/?currentschema=tpcc'
 };
 
 function onDbTypeChange() {

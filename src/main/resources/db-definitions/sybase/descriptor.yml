@@ -2,8 +2,8 @@ name: Sybase
 type: sybase
 aliases:
   - ase
-driver: com.sybase.jdbc4.jdbc.SybDriver
-url: "jdbc:sybase:Tds:{host}:{port}/{database}"
+driver: net.sourceforge.jtds.jdbc.Driver
+url: "jdbc:jtds:sybase://{host}:{port}/{database}"
 noLimit: true
 dropStatement: "IF EXISTS (SELECT 1 FROM sysobjects WHERE name='${tableName}') DROP TABLE ${tableName}"
 metrics:

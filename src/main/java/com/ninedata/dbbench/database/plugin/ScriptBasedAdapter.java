@@ -71,6 +71,12 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
 
     @Override
     protected void configureHikari(HikariConfig hikariConfig) {
+        // Use connectionTestQuery for drivers that don't support JDBC4 isValid() (e.g. jTDS)
+        String validationQuery = definition.getValidationQuery();
+        if (validationQuery != null) {
+            hikariConfig.setConnectionTestQuery(validationQuery);
+        }
+
         List<String> initStmts = definition.getInit();
         if (initStmts != null && !initStmts.isEmpty()) {
             String combined = String.join("; ", initStmts);
@@ -232,7 +238,7 @@ public class ScriptBasedAdapter extends AbstractDatabaseAdapter {
                         parseResultSet(rs, mq, metrics);
                         rs.close();
                     } catch (SQLException e) {
-                        log.debug("Metrics query failed for {}: {}", definition.getName(), e.getMessage());
+                        log.error("Metrics query failed for {}: {}", definition.getName(), e.getMessage());
                     }
                 }
                 conn.commit();

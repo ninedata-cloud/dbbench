@@ -6,18 +6,20 @@ driver: com.gbasedbt.jdbc.Driver
 url: "jdbc:gbasedbt-sqli://{host}:{port}/{database}"
 validation: "SELECT 1 FROM systables WHERE tabid = 1"
 noLimit: true
+dropStatement: "DROP TABLE ${tableName}"
 metrics:
-  - active_connections: "SELECT COUNT(*) FROM sysmaster:syssessions WHERE connected > 0"
+  - active_connections: "SELECT COUNT(*) FROM sysmaster.syssessions WHERE connected > 0"
+  - total_connections: "SELECT COUNT(*) FROM sysmaster.syssessions"
   - sql: >
-      SELECT SUM(bufreads) as buffer_reads, SUM(pagreads) as physical_reads
-      FROM sysmaster:syschkio
+      SELECT name, value FROM sysmaster.sysprofile
+      WHERE name IN ('bufreads', 'pagreads')
     map:
-      buffer_reads: buffer_reads
-      physical_reads: physical_reads
-  - lock_waits: "SELECT COUNT(*) FROM sysmaster:syslocks WHERE waiter > 0"
-  - buffer_pool_hit_ratio: "((buffer_reads - physical_reads) / buffer_reads) * 100"
+      bufreads: bufreads
+      pagreads: pagreads
+  - lock_waits: "SELECT COUNT(*) FROM sysmaster.syslocks WHERE waiter > 0"
+  - buffer_pool_hit_ratio: "((bufreads - pagreads) / bufreads) * 100"
     computed: true
 hostMetrics:
   - sql: >
       SELECT SUM(pagesread) * 4096 as diskReadBytes, SUM(pageswritten) * 4096 as diskWriteBytes
-      FROM sysmaster:syschkio
+      FROM sysmaster.syschkio

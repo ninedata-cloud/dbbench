@@ -58,6 +58,16 @@ public class BenchmarkEngine {
     private volatile Map<String, Object> cachedClientHardwareInfo = null;
     private volatile Map<String, Object> cachedDbServerHardwareInfo = null;
 
+    // Previous cumulative values for rate calculation (SQL-sourced host metrics)
+    private long lastHostMetricsTime = 0;
+    private double lastDiskReadBytes = -1;
+    private double lastDiskWriteBytes = -1;
+    private double lastNetRecvBytes = -1;
+    private double lastNetSentBytes = -1;
+    private double lastCpuUserTime = -1;
+    private double lastCpuSysTime = -1;
+    private double lastCpuIdleTime = -1;
+
     // TPC-C Keying time means (seconds) per transaction type
     // Index: 0=NewOrder, 1=Payment, 2=OrderStatus, 3=Delivery, 4=StockLevel
     private static final double[] KEYING_TIME_MEAN = {18.0, 3.0, 2.0, 2.0, 2.0};
@@ -407,8 +417,9 @@ public class BenchmarkEngine {
 
     private void startMetricsCollection() {
         stopMetricsCollection();
+        long intervalMs = benchConfig.getMetricsInterval();
         metricsScheduler = Executors.newScheduledThreadPool(2);
-        metricsScheduler.scheduleAtFixedRate(this::collectAndBroadcastMetrics, 1, 1, TimeUnit.SECONDS);
+        metricsScheduler.scheduleAtFixedRate(this::collectAndBroadcastMetrics, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
     }
 
     private void stopMetricsCollection() {
@@ -446,6 +457,16 @@ public class BenchmarkEngine {
         running.set(true);
         status = "RUNNING";
         metricsRegistry.reset();
+
+        // Reset cumulative rate calculation state
+        lastHostMetricsTime = 0;
+        lastDiskReadBytes = -1;
+        lastDiskWriteBytes = -1;
+        lastNetRecvBytes = -1;
+        lastNetSentBytes = -1;
+        lastCpuUserTime = -1;
+        lastCpuSysTime = -1;
+        lastCpuIdleTime = -1;
 
         AbstractTransaction.setErrorCallback(this::addLog);
 
@@ -621,6 +642,9 @@ public class BenchmarkEngine {
                 hostMetrics = adapter.collectHostMetrics();
             }
 
+            // Convert cumulative host metrics to per-second rates
+            convertCumulativeToRates(hostMetrics);
+
             metricsRegistry.takeSnapshot(dbMetrics, clientMetrics, hostMetrics);
 
             if (metricsCallback != null) {
@@ -645,6 +669,61 @@ public class BenchmarkEngine {
         } catch (Exception e) {
             log.warn("Error collecting metrics: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Convert cumulative byte counters (from SQL queries) to per-second rates.
+     * If the metrics already contain *PerSec fields (e.g. from SSH), they are left as-is.
+     */
+    private void convertCumulativeToRates(Map<String, Object> metrics) {
+        if (metrics == null || metrics.isEmpty()) return;
+
+        // Skip if already has per-sec fields (SSH or OS-level collectors provide these directly)
+        if (metrics.containsKey("diskReadBytesPerSec")) return;
+
+        long now = System.currentTimeMillis();
+        double diskRead = toDouble(metrics.get("diskReadBytes"));
+        double diskWrite = toDouble(metrics.get("diskWriteBytes"));
+        double netRecv = toDouble(metrics.get("networkRecvBytes"));
+        double netSent = toDouble(metrics.get("networkSentBytes"));
+        double cpuUser = toDouble(metrics.get("cpuUserTime"));
+        double cpuSys = toDouble(metrics.get("cpuSysTime"));
+        double cpuIdle = toDouble(metrics.get("cpuIdleTime"));
+
+        if (lastHostMetricsTime > 0) {
+            double elapsed = (now - lastHostMetricsTime) / 1000.0;
+            if (elapsed > 0) {
+                if (lastDiskReadBytes >= 0 && diskRead >= 0) {
+                    metrics.put("diskReadBytesPerSec", Math.max(0, (diskRead - lastDiskReadBytes) / elapsed));
+                    metrics.put("diskWriteBytesPerSec", Math.max(0, (diskWrite - lastDiskWriteBytes) / elapsed));
+                }
+                if (lastNetRecvBytes >= 0 && netRecv >= 0) {
+                    metrics.put("networkRecvBytesPerSec", Math.max(0, (netRecv - lastNetRecvBytes) / elapsed));
+                    metrics.put("networkSentBytesPerSec", Math.max(0, (netSent - lastNetSentBytes) / elapsed));
+                }
+                // CPU cumulative time -> usage percentage (e.g. HANA M_HOST_RESOURCE_UTILIZATION)
+                if (lastCpuUserTime >= 0 && cpuUser >= 0) {
+                    double deltaUser = cpuUser - lastCpuUserTime;
+                    double deltaSys = cpuSys - lastCpuSysTime;
+                    double deltaIdle = cpuIdle - lastCpuIdleTime;
+                    double deltaTotal = deltaUser + deltaSys + deltaIdle;
+                    if (deltaTotal > 0) {
+                        metrics.put("cpuUsage", (deltaUser + deltaSys) / deltaTotal * 100.0);
+                    }
+                }
+            }
+        }
+
+        lastHostMetricsTime = now;
+        if (diskRead >= 0) { lastDiskReadBytes = diskRead; lastDiskWriteBytes = diskWrite; }
+        if (netRecv >= 0) { lastNetRecvBytes = netRecv; lastNetSentBytes = netSent; }
+        if (cpuUser >= 0) { lastCpuUserTime = cpuUser; lastCpuSysTime = cpuSys; lastCpuIdleTime = cpuIdle; }
+    }
+
+    private static double toDouble(Object val) {
+        if (val instanceof Number) return ((Number) val).doubleValue();
+        if (val == null) return -1;
+        try { return Double.parseDouble(val.toString()); } catch (NumberFormatException e) { return -1; }
     }
 
     public void stop() {

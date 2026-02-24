@@ -15,10 +15,11 @@ metrics:
   - lock_waits: "SELECT COUNT(*) FROM V$LOCK WHERE BLOCKED = 1"
 hostMetrics:
   - sql: >
-      SELECT NAME, STAT_VAL FROM V$SYSTEMINFO
-      WHERE NAME IN ('OS_CPU_USER', 'OS_CPU_SYS', 'OS_MEM_TOTAL', 'OS_MEM_FREE')
-    map:
-      OS_CPU_USER: cpuUsage
-      OS_CPU_SYS: cpuSystem
-      OS_MEM_TOTAL: totalMemory
-      OS_MEM_FREE: freeMemory
+      SELECT 100-cpu_idle_rate "cpuUsage",send_bytes_total "networkSentBytes",receive_bytes_total "networkRecvBytes",n_cpu "cpuCores" FROM V$SYSTEMINFO a
+  - sql: >
+      SELECT a.PARA_VALUE*b.stat_val "diskReadBytes",a.PARA_VALUE*c.stat_val+d.stat_val AS "diskWriteBytes" FROM
+      (SELECT max(PARA_VALUE) PARA_VALUE FROM V$DM_INI WHERE PARA_NAME = 'GLOBAL_PAGE_SIZE') a,
+      (SELECT stat_val FROM V$SYSSTAT WHERE name = 'physical read count') b,
+      (SELECT stat_val FROM V$SYSSTAT WHERE name ='physical write count') c,
+      (SELECT stat_val FROM V$SYSSTAT WHERE name ='log write bytes') d
+

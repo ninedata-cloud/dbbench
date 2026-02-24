@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS warehouse (
+CREATE TABLE warehouse (
     w_id INT NOT NULL,
     w_name VARCHAR(10),
     w_street_1 VARCHAR(20),
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS warehouse (
     PRIMARY KEY (w_id)
 );
 
-CREATE TABLE IF NOT EXISTS district (
+CREATE TABLE district (
     d_id INT NOT NULL,
     d_w_id INT NOT NULL,
     d_name VARCHAR(10),
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS district (
     PRIMARY KEY (d_w_id, d_id)
 );
 
-CREATE TABLE IF NOT EXISTS customer (
+CREATE TABLE customer (
     c_id INT NOT NULL,
     c_d_id INT NOT NULL,
     c_w_id INT NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS customer (
     PRIMARY KEY (c_w_id, c_d_id, c_id)
 );
 
-CREATE TABLE IF NOT EXISTS item (
+CREATE TABLE item (
     i_id INT NOT NULL,
     i_im_id INT,
     i_name VARCHAR(24),
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS item (
     PRIMARY KEY (i_id)
 );
 
-CREATE TABLE IF NOT EXISTS stock (
+CREATE TABLE stock (
     s_i_id INT NOT NULL,
     s_w_id INT NOT NULL,
     s_quantity INT,
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS stock (
     PRIMARY KEY (s_w_id, s_i_id)
 );
 
-CREATE TABLE IF NOT EXISTS history (
+CREATE TABLE history (
     h_c_id INT,
     h_c_d_id INT,
     h_c_w_id INT,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS history (
     h_data VARCHAR(24)
 );
 
-CREATE TABLE IF NOT EXISTS oorder (
+CREATE TABLE oorder (
     o_id INT NOT NULL,
     o_d_id INT NOT NULL,
     o_w_id INT NOT NULL,
@@ -104,14 +104,14 @@ CREATE TABLE IF NOT EXISTS oorder (
     PRIMARY KEY (o_w_id, o_d_id, o_id)
 );
 
-CREATE TABLE IF NOT EXISTS new_order (
+CREATE TABLE new_order (
     no_o_id INT NOT NULL,
     no_d_id INT NOT NULL,
     no_w_id INT NOT NULL,
     PRIMARY KEY (no_w_id, no_d_id, no_o_id)
 );
 
-CREATE TABLE IF NOT EXISTS order_line (
+CREATE TABLE order_line (
     ol_o_id INT NOT NULL,
     ol_d_id INT NOT NULL,
     ol_w_id INT NOT NULL,
