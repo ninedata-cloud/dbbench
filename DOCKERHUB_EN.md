@@ -2,12 +2,12 @@
 
 **Ready-to-Use TPC-C Database Benchmark Tool**
 
-DBBench is a professional database performance testing tool that fully implements the TPC-C benchmark specification. It supports 13 major databases and provides a real-time web monitoring dashboard.
+DBBench is a professional database performance testing tool that fully implements the TPC-C benchmark specification. It supports 12 major databases and provides a real-time web monitoring dashboard.
 
 ## Image Highlights
 
 - **Ready to Use**: Built-in PostgreSQL 17, no external database configuration required
-- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, GBase8s, Sybase, SAP HANA
+- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, Sybase, SAP HANA
 - **Real-Time Monitoring**: Web UI with live TPS, latency, CPU, memory, network metrics and time range selector (All / 1m / 10m / 1h / 6h / 1day / Custom)
 - **Full TPC-C**: All 5 transaction types (New-Order, Payment, Order-Status, Delivery, Stock-Level)
 - **CSV Fast Load**: Database-native bulk import (MySQL LOAD DATA, PostgreSQL COPY, etc.) for faster data loading
@@ -86,8 +86,7 @@ docker run -d -p 1929:1929 \
 | Dameng | `jdbc:dm://host:5236/database`                                  |
 | SQLite | `jdbc:sqlite:./tpcc.db`                                         |
 | YashanDB | `jdbc:yasdb://host:1688/database`                               |
-| GBase8s | `jdbc:gbasedbt-sqli://host:9088/database:GBASEDBTSERVER=server` |
-| Sybase | `jdbc:sybase:Tds:host:5000/database`                            |
+| Sybase | `jdbc:jtds:sybase://host:5000/database`                         |
 | SAP HANA | `jdbc:sap://host:30015/?currentschema=schemaName`               |
 
 ## Usage Workflow

@@ -1562,7 +1562,6 @@ const jdbcUrlTemplates = {
     tidb: 'jdbc:mysql://127.0.0.1:4000/tpcc?useSSL=false&rewriteBatchedStatements=true',
     sqlite: 'jdbc:sqlite:./tpcc.db',
     yashandb: 'jdbc:yasdb://127.0.0.1:1688/tpcc',
-    gbase8s: 'jdbc:gbasedbt-sqli://127.0.0.1:9088/tpcc:GBASEDBTSERVER=gbase01',
     sybase: 'jdbc:jtds:sybase://127.0.0.1:5000/tpcc',
     hana: 'jdbc:sap://127.0.0.1:39017/?currentschema=tpcc'
 };

@@ -36,9 +36,17 @@ public class TerminalContext {
      */
     public PreparedStatement prepareStatement(String sql) throws SQLException {
         PreparedStatement ps = stmtCache.get(sql);
-        if (ps != null && !ps.isClosed()) {
-            ps.clearParameters();
-            return ps;
+        if (ps != null) {
+            try {
+                if (!ps.isClosed()) {
+                    ps.clearParameters();
+                    return ps;
+                }
+            } catch (AbstractMethodError | Exception ignored) {
+                // Driver doesn't support isClosed() (JDBC3) - assume open
+                ps.clearParameters();
+                return ps;
+            }
         }
         ps = connection.prepareStatement(sql);
         stmtCache.put(sql, ps);
@@ -51,7 +59,7 @@ public class TerminalContext {
     public void reconnect() throws SQLException {
         closeStatements();
         try {
-            if (connection != null && !connection.isClosed()) {
+            if (connection != null) {
                 connection.close();
             }
         } catch (SQLException ignored) {}
@@ -69,7 +77,7 @@ public class TerminalContext {
     public void close() {
         closeStatements();
         try {
-            if (connection != null && !connection.isClosed()) {
+            if (connection != null) {
                 connection.close();
             }
         } catch (SQLException ignored) {}

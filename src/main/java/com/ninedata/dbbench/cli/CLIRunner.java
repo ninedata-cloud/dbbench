@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-@Command(name = "dbbench", mixinStandardHelpOptions = true, version = "0.7.0",
+@Command(name = "dbbench", mixinStandardHelpOptions = true, version = "0.8.0",
         description = "NineData DBBench - TPC-C Database Benchmark Tool%n%n" +
                 "Usage examples:%n" +
                 "  dbbench -f config.properties load        Load test data%n" +
@@ -239,7 +239,7 @@ public class CLIRunner implements Callable<Integer> {
         System.out.println(" | |_| | |_) | |_) |  __/ | | | (__| | | |");
         System.out.println(" |____/|____/|____/ \\___|_| |_|\\___|_| |_|");
         System.out.println();
-        System.out.println("  TPC-C Database Benchmark Tool  v0.7.0");
+        System.out.println("  TPC-C Database Benchmark Tool  v0.8.0");
         System.out.println();
     }
 

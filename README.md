@@ -16,7 +16,7 @@
 
 ## Features
 
-- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, GBase8s, Sybase, SAP HANA
+- **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, Sybase, SAP HANA
 - **Full TPC-C Implementation**: All 5 transaction types with configurable mix
 - **Real-Time Dashboard**: Web UI with live charts, time range selector, and metrics
 - **CSV Fast Load**: Database-native bulk import for faster data loading (MySQL LOAD DATA, PostgreSQL COPY, etc.)
@@ -38,8 +38,7 @@
 | Dameng | `jdbc:dm://host:5236/database` |
 | SQLite | `jdbc:sqlite:./tpcc.db` |
 | YashanDB | `jdbc:yasdb://host:1688/database` |
-| GBase8s | `jdbc:gbasedbt-sqli://host:9088/database:GBASEDBTSERVER=server` |
-| Sybase | `jdbc:sybase:Tds:host:5000/database` |
+| Sybase | `jdbc:jtds:sybase://host:5000/database` |
 | SAP HANA | `jdbc:sap://host:30015/?databaseName=database` |
 
 #### Main Dashboard
@@ -108,21 +107,17 @@ Some databases require proprietary JDBC drivers that are not available in Maven 
 | Database | Driver JAR | How to Obtain |
 |----------|-----------|---------------|
 | SAP HANA | `ngdbc-*.jar` | [SAP Development Tools](https://tools.hana.ondemand.com/#hanatools) |
-| GBase 8s | `gbasedbt-jdbc-*.jar` | Contact [GBase](https://www.gbase.cn) or extract from GBase 8s installation |
-| Sybase ASE | `jconn4.jar` | Extract from SAP ASE installation (`$SYBASE/jConnect-*/classes/jconn4.jar`) |
 
 Place the driver JAR in the classpath when running:
 
 ```bash
-java -cp "target/dbbench-0.7.0.jar:drivers/*" com.ninedata.dbbench.DBBenchApplication
+java -cp "target/dbbench-0.8.0.jar:drivers/*" com.ninedata.dbbench.DBBenchApplication
 ```
 
 Or install to your local Maven repository:
 
 ```bash
 mvn install:install-file -Dfile=ngdbc.jar -DgroupId=com.sap.cloud.db.jdbc -DartifactId=ngdbc -Dversion=2.20.11 -Dpackaging=jar
-mvn install:install-file -Dfile=gbasedbt-jdbc.jar -DgroupId=com.gbasedbt -DartifactId=gbasedbt-jdbc -Dversion=3.5.1 -Dpackaging=jar
-mvn install:install-file -Dfile=jconn4.jar -DgroupId=com.sybase -DartifactId=jconn4 -Dversion=16.0 -Dpackaging=jar
 ```
 
 ### Web Mode
@@ -130,7 +125,7 @@ mvn install:install-file -Dfile=jconn4.jar -DgroupId=com.sybase -DartifactId=jco
 Start the web server:
 
 ```bash
-java -jar target/dbbench-0.7.0.jar
+java -jar target/dbbench-0.8.0.jar
 ```
 
 Open http://localhost:1929 in your browser.
@@ -148,19 +143,19 @@ CLI mode reads all configuration from a profile file (`-f`), the same format use
 
 ```bash
 # Load test data
-java -jar target/dbbench-0.7.0.jar -f profiles/local-mysql.properties load
+java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties load
 
 # Run benchmark (data must be loaded first)
-java -jar target/dbbench-0.7.0.jar -f profiles/local-mysql.properties run
+java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties run
 
 # Clean existing data
-java -jar target/dbbench-0.7.0.jar -f profiles/local-mysql.properties clean
+java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties clean
 
 # Combine actions: clean → load → run
-java -jar target/dbbench-0.7.0.jar -f profiles/local-mysql.properties clean load run
+java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties clean load run
 
 # Override specific settings from config file
-java -jar target/dbbench-0.7.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
+java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
 ```
 
 ## CLI Options
