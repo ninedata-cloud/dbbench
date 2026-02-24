@@ -53,11 +53,9 @@
 
 - Java 17+ (or Docker)
 - Maven 3.6+ (for building from source)
-- Target database with an empty database created (not needed for Docker)
+- Target database with an empty database created
 
 ### Docker Quick Start (Recommended)
-
-The Docker image includes both PostgreSQL 17 and DBBench in a single container - no external database required:
 
 ```bash
 # Clone the repository
@@ -66,28 +64,23 @@ cd dbbench
 
 # Build and run
 docker build -t dbbench:latest .
-docker run -d -p 1929:1929 -p 5432:5432 --name dbbench dbbench:latest
-```
-
-Open http://localhost:1929 in your browser.
-
-**Built-in PostgreSQL credentials:**
-- Host: `localhost:5432`
-- Database: `tpcc`
-- Username: `postgres`
-- Password: `postgres`
-
-The database is pre-configured and ready to use. Just click "Load Data" in the web UI to start.
-
-### Connect to External Database
-
-To use an external database instead of the built-in PostgreSQL:
-
-```bash
 docker run -d -p 1929:1929 \
   -e DB_TYPE=mysql \
   -e DB_JDBC_URL="jdbc:mysql://host.docker.internal:3306/tpcc?useSSL=false&rewriteBatchedStatements=true" \
   -e DB_USERNAME=root \
+  -e DB_PASSWORD=password \
+  --name dbbench dbbench:latest
+```
+
+Open http://localhost:1929 in your browser. Configure the database connection in the web UI, click "Load Data" to generate test data, then "Start" to run the benchmark.
+
+### Connect to Other Databases
+
+```bash
+docker run -d -p 1929:1929 \
+  -e DB_TYPE=postgresql \
+  -e DB_JDBC_URL="jdbc:postgresql://host.docker.internal:5432/tpcc" \
+  -e DB_USERNAME=postgres \
   -e DB_PASSWORD=password \
   --name dbbench dbbench:latest
 ```

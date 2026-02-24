@@ -6,7 +6,6 @@ DBBench is a professional database performance testing tool that fully implement
 
 ## Image Highlights
 
-- **Ready to Use**: Built-in PostgreSQL 17, no external database configuration required
 - **Multi-Database Support**: MySQL, PostgreSQL, Oracle, SQL Server, DB2, TiDB, OceanBase, Dameng, SQLite, YashanDB, Sybase, SAP HANA
 - **Real-Time Monitoring**: Web UI with live TPS, latency, CPU, memory, network metrics and time range selector (All / 1m / 10m / 1h / 6h / 1day / Custom)
 - **Full TPC-C**: All 5 transaction types (New-Order, Payment, Order-Status, Delivery, Stock-Level)
@@ -15,15 +14,7 @@ DBBench is a professional database performance testing tool that fully implement
 
 ## Quick Start
 
-### Using Built-in PostgreSQL (Simplest)
-
-```bash
-docker run -d -p 1929:1929 --name dbbench yzsind/dbbench:latest
-```
-
-Open http://localhost:1929 in your browser to start testing.
-
-### Connect to External MySQL
+### Connect to MySQL
 
 ```bash
 docker run -d -p 1929:1929 \
@@ -34,7 +25,9 @@ docker run -d -p 1929:1929 \
   --name dbbench yzsind/dbbench:latest
 ```
 
-### Connect to External PostgreSQL
+Open http://localhost:1929 in your browser to start testing.
+
+### Connect to PostgreSQL
 
 ```bash
 docker run -d -p 1929:1929 \
@@ -60,10 +53,10 @@ docker run -d -p 1929:1929 \
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DB_TYPE` | Database type | postgresql |
-| `DB_JDBC_URL` | JDBC connection URL | jdbc:postgresql://localhost:5432/tpcc |
-| `DB_USERNAME` | Database username | postgres |
-| `DB_PASSWORD` | Database password | postgres |
+| `DB_TYPE` | Database type | mysql |
+| `DB_JDBC_URL` | JDBC connection URL | jdbc:mysql://host.docker.internal:3306/tpcc |
+| `DB_USERNAME` | Database username | root |
+| `DB_PASSWORD` | Database password | (empty) |
 | `DB_POOL_SIZE` | Connection pool size | 50 |
 | `BENCHMARK_WAREHOUSES` | Number of warehouses (data scale) | 10 |
 | `BENCHMARK_TERMINALS` | Concurrent terminals | 50 |
@@ -93,7 +86,7 @@ docker run -d -p 1929:1929 \
 
 1. **Start Container**: Run the docker run command
 2. **Access Web UI**: Open http://localhost:1929
-3. **Configure Connection**: Set database connection in the config panel (skip if using built-in PostgreSQL)
+3. **Configure Connection**: Set database connection in the config panel
 4. **Load Data**: Click "Load Data" to generate test data
 5. **Run Benchmark**: Click "Start" to begin the benchmark
 6. **View Results**: Monitor TPS, latency, and system resources in real-time, use time range selector to view different periods
@@ -117,20 +110,6 @@ Each warehouse contains approximately:
 | Port | Purpose |
 |------|---------|
 | 1929 | Web UI and REST API |
-| 5432 | Built-in PostgreSQL (optional) |
-
-## Built-in PostgreSQL Connection
-
-To connect directly to the built-in database:
-- Host: `localhost:5432`
-- Database: `tpcc`
-- Username: `postgres`
-- Password: `my_postgres_password`
-
-```bash
-# Expose PostgreSQL port
-docker run -d -p 1929:1929 -p 5432:5432 --name dbbench yzsind/dbbench:latest
-```
 
 ## REST API
 
