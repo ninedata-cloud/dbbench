@@ -27,9 +27,9 @@ hostMetrics:
       (SELECT VALUE FROM V$OSSTAT WHERE STAT_NAME = 'FREE_MEMORY_BYTES') AS memFreeBytes
       FROM DUAL
   - sql: >
-      SELECT SUM(PHYBLKRD) * 8192 as diskReadBytes, SUM(PHYBLKWRT) * 8192 as diskWriteBytes
+      SELECT SUM(PHYBLKRD) * 8192 as "diskReadBytes", SUM(PHYBLKWRT) * 8192 as "diskWriteBytes"
       FROM V$FILESTAT
   - sql: >
-      SELECT SUM(CASE WHEN name LIKE 'bytes received via%' THEN value ELSE 0 END) AS networkRecvBytes,
-      SUM(CASE WHEN name LIKE 'bytes sent via%' THEN value ELSE 0 END) AS networkSentBytes
+      SELECT SUM(CASE WHEN name LIKE 'bytes received via%' THEN value ELSE 0 END) AS "networkRecvBytes",
+      SUM(CASE WHEN name LIKE 'bytes sent via%' THEN value ELSE 0 END) AS "networkSentBytes"
       FROM V$SYSSTAT WHERE name LIKE 'bytes%via SQL*Net%'
