@@ -29,7 +29,7 @@ Open http://localhost:1929 in your browser to start testing.
 | SQL Server | `jdbc:sqlserver://host:1433;databaseName=db`                    |
 | DB2 | `jdbc:db2://host:50000/database`                                |
 | TiDB | `jdbc:mysql://host:4000/database`                               |
-| OceanBase | `jdbc:oceanbase://host:2881/database`                           |
+| OceanBase | `jdbc:mysql://host:2881/database`                               |
 | Dameng | `jdbc:dm://host:5236/database`                                  |
 | SQLite | `jdbc:sqlite:./tpcc.db`                                         |
 | YashanDB | `jdbc:yasdb://host:1688/database`                               |

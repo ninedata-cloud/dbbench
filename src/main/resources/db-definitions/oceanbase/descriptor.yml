@@ -1,7 +1,7 @@
 name: OceanBase(MySQL)
 type: oceanbase
-driver: com.oceanbase.jdbc.Driver
-url: "jdbc:oceanbase://{host}:{port}/{database}"
+driver: com.mysql.cj.jdbc.Driver
+url: "jdbc:mysql://{host}:{port}/{database}"
 urlParams:
   allowLoadLocalInfile: "true"
   rewriteBatchedStatements: "true"

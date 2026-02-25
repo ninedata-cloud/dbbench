@@ -1558,7 +1558,7 @@ const jdbcUrlTemplates = {
     sqlserver: 'jdbc:sqlserver://127.0.0.1:1433;databaseName=tpcc;encrypt=false',
     db2: 'jdbc:db2://127.0.0.1:50000/tpcc',
     dameng: 'jdbc:dm://127.0.0.1:5236/tpcc',
-    oceanbase: 'jdbc:oceanbase://127.0.0.1:2881/tpcc',
+    oceanbase: 'jdbc:mysql://127.0.0.1:2881/tpcc',
     tidb: 'jdbc:mysql://127.0.0.1:4000/tpcc?useSSL=false&rewriteBatchedStatements=true',
     sqlite: 'jdbc:sqlite:./tpcc.db',
     yashandb: 'jdbc:yasdb://127.0.0.1:1688/tpcc',

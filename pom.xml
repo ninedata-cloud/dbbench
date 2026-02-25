@@ -87,12 +87,6 @@
             <artifactId>yashandb-jdbc</artifactId>
             <version>1.7.10</version>
         </dependency>
-        <!-- OceanBase -->
-        <dependency>
-            <groupId>com.oceanbase</groupId>
-            <artifactId>oceanbase-client</artifactId>
-            <version>2.4.12</version>
-        </dependency>
         <dependency>
             <groupId>net.sourceforge.jtds</groupId>
             <artifactId>jtds</artifactId>
