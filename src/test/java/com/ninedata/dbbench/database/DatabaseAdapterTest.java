@@ -110,7 +110,7 @@ class DatabaseAdapterTest {
         config.setType("tidb");
         assertEquals("TiDB", DatabaseFactory.create(config).getDatabaseType());
         config.setType("oceanbase");
-        assertEquals("OceanBase", DatabaseFactory.create(config).getDatabaseType());
+        assertEquals("OceanBase(MySQL)", DatabaseFactory.create(config).getDatabaseType());
     }
 
     @Test

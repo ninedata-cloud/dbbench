@@ -116,7 +116,7 @@ class DatabaseFactoryTest {
         config.setType("oceanbase");
         DatabaseAdapter adapter = DatabaseFactory.create(config);
         assertNotNull(adapter);
-        assertEquals("OceanBase", adapter.getDatabaseType());
+        assertEquals("OceanBase(MySQL)", adapter.getDatabaseType());
     }
 
     @Test

@@ -92,7 +92,7 @@ class DatabaseConfigTest {
     @DisplayName("Should return correct driver for OceanBase")
     void testOceanBaseDriver() {
         config.setType("oceanbase");
-        assertEquals("com.oceanbase.jdbc.Driver", config.getDriverClassName());
+        assertEquals("com.mysql.cj.jdbc.Driver", config.getDriverClassName());
     }
 
     @Test
