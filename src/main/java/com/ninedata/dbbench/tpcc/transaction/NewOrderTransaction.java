@@ -63,7 +63,7 @@ public class NewOrderTransaction extends AbstractTransaction {
         wTax = rs.getDouble(1);
         rs.close();
 
-        // Get district info and update next order ID
+        // Get district info and update next order ID atomically
         double dTax;
         int orderId;
         String districtSql = buildSelectForUpdateQuery("SELECT d_tax, d_next_o_id FROM district WHERE d_w_id = ? AND d_id = ?");
@@ -74,13 +74,14 @@ public class NewOrderTransaction extends AbstractTransaction {
         if (!rs.next()) return false;
         dTax = rs.getDouble(1);
         orderId = rs.getInt(2);
-        rs.close();
 
+        // Update d_next_o_id BEFORE closing the cursor to keep the FOR UPDATE lock on DB2
         ps = ctx.prepareStatement("UPDATE district SET d_next_o_id = ? WHERE d_w_id = ? AND d_id = ?");
         ps.setInt(1, orderId + 1);
         ps.setInt(2, warehouseId);
         ps.setInt(3, districtId);
         ps.executeUpdate();
+        rs.close();
 
         // Get customer discount
         double cDiscount;
