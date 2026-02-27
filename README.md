@@ -49,7 +49,7 @@
 
 ## Docker Quick Start (Recommended) 
 ```bash
-docker run -d -p 1929:1929 --name dbbench yzsind/dbbench:latest
+docker run -d -p 1929:1929 --name dbbench ninedata/dbbench:latest
 ```
 
 Open http://localhost:1929 in your browser to start testing.
@@ -63,20 +63,32 @@ Open http://localhost:1929 in your browser to start testing.
 - Target database with an empty database created
 
 ```bash
-git clone https://github.com/yzsind/dbbench.git
+git clone https://github.com/ninedata/dbbench.git
 cd dbbench
 mvn clean package -DskipTests
 ```
 
 ### Web Mode
 
-Start the web server:
+Start the web server (default port 1929):
 
 ```bash
-java -jar target/dbbench-0.8.0.jar
+java -jar target/dbbench-0.9.0.jar
 ```
 
-Open http://localhost:1929 in your browser.
+Specify a custom port using `--port`:
+
+```bash
+java -jar target/dbbench-0.9.0.jar --port 8080
+```
+
+Or use the `SERVER_PORT` environment variable:
+
+```bash
+SERVER_PORT=8080 java -jar target/dbbench-0.9.0.jar
+```
+
+Open http://localhost:1929 (or your custom port) in your browser.
 
 From the web dashboard you can:
 1. Configure database connection and test it
@@ -91,19 +103,19 @@ CLI mode reads all configuration from a profile file (`-f`), the same format use
 
 ```bash
 # Load test data
-java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties load
+java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties load
 
 # Run benchmark (data must be loaded first)
-java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties run
+java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties run
 
 # Clean existing data
-java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties clean
+java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties clean
 
 # Combine actions: clean → load → run
-java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties clean load run
+java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties clean load run
 
 # Override specific settings from config file
-java -jar target/dbbench-0.8.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
+java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
 ```
 
 ## CLI Options

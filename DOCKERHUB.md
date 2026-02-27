@@ -14,7 +14,7 @@ DBBench is a professional database performance testing tool that fully implement
 
 ## Quick Start
 ```bash
-docker run -d -p 1929:1929 --name dbbench yzsind/dbbench:latest
+docker run -d -p 1929:1929 --name dbbench ninedata/dbbench:latest
 ```
 
 Open http://localhost:1929 in your browser to start testing.
@@ -132,8 +132,8 @@ java -jar /app/dbbench.jar -f /app/profiles/config.properties -w 20 -c 100 -d 30
 
 ## Source Code & Documentation
 
-- GitHub: https://github.com/yzsind/dbbench
-- Issues: https://github.com/yzsind/dbbench/issues
+- GitHub: https://github.com/ninedata/dbbench
+- Issues: https://github.com/ninedata/dbbench/issues
 
 ## License
 
