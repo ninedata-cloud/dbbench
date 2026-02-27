@@ -29,9 +29,12 @@ metrics:
   - buffer_pool_hit_ratio: "((buffer_pool_reads - buffer_pool_read_misses) / buffer_pool_reads) * 100"
     computed: true
 hostMetrics:
-  - sql: "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_data_read', 'Innodb_data_written', 'Bytes_received', 'Bytes_sent')"
+  - sql: "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_data_read', 'Innodb_data_written','Innodb_os_log_written', 'Bytes_received', 'Bytes_sent')"
     map:
       Innodb_data_read: diskReadBytes
-      Innodb_data_written: diskWriteBytes
+      Innodb_data_written: Innodb_data_written
+      Innodb_os_log_written: Innodb_os_log_written
       Bytes_received: networkRecvBytes
       Bytes_sent: networkSentBytes
+  - diskWriteBytes: "Innodb_data_written+Innodb_os_log_written"
+    computed: true

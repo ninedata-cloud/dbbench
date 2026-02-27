@@ -132,8 +132,8 @@ java -jar /app/dbbench.jar -f /app/profiles/config.properties -w 20 -c 100 -d 30
 
 ## Source Code & Documentation
 
-- GitHub: https://github.com/ninedata/dbbench
-- Issues: https://github.com/ninedata/dbbench/issues
+- GitHub: https://github.com/ninedata-cloud/dbbench
+- Issues: https://github.com/ninedata-cloud/dbbench/issues
 
 ## License
 

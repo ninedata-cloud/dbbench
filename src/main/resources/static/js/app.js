@@ -25,6 +25,7 @@ const chartDataBuffer = {
     dbConn:  { labels: [], timestamps: [], data: [] }
 };
 let currentConfig = null;
+let currentProfileName = 'default';
 let savedDbPassword = '';
 let savedSshPassword = '';
 let allLogs = [];
@@ -830,6 +831,7 @@ function updateStatus(status) {
 // ==================== Configuration ====================
 
 function displayConfig(cfg) {
+    document.getElementById('cfgProfileName').textContent = currentProfileName || 'default';
     if (cfg.database) {
         document.getElementById('cfgDbType').textContent = cfg.database.type?.toUpperCase() || '-';
         document.getElementById('cfgJdbcUrl').textContent = cfg.database.jdbcUrl || '-';
@@ -991,6 +993,7 @@ async function saveConfig() {
 
         if (data.success) {
             currentConfig = data.config;
+            currentProfileName = document.getElementById('profileSelect').value || 'default';
             displayConfig(currentConfig);
 
             // Save to current profile
@@ -1889,6 +1892,7 @@ async function saveProfile() {
         if (data.success) {
             showToast('success', 'Profile Saved', data.message);
             addLog('Profile saved: ' + name.trim(), 'success');
+            currentProfileName = name.trim();
             await loadProfiles();
             document.getElementById('profileSelect').value = name.trim();
         } else {
@@ -1916,6 +1920,10 @@ async function deleteProfile() {
         if (data.success) {
             showToast('success', 'Profile Deleted', data.message);
             addLog('Profile deleted: ' + name, 'info');
+            if (currentProfileName === name) {
+                currentProfileName = 'default';
+                document.getElementById('cfgProfileName').textContent = 'default';
+            }
             await loadProfiles();
         } else {
             showToast('error', 'Delete Failed', data.error);

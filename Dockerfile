@@ -14,7 +14,7 @@ LABEL maintainer="NineData <support@ninedata.cloud>"
 LABEL description="NineData DBBench - TPC-C Database Benchmark Tool"
 
 # Copy the built jar
-COPY --from=builder /app/target/dbbench-0.8.0.jar /app/dbbench.jar
+COPY --from=builder /app/target/dbbench-0.9.0.jar /app/dbbench.jar
 
 # Expose web UI port
 EXPOSE 1929

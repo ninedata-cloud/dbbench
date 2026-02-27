@@ -42,10 +42,10 @@
 | SAP HANA | `jdbc:sap://host:30015/?databaseName=database` |
 
 #### Main Dashboard
-![Main Dashboard](src/main/resources/static/img/main1.jpg)
+![Main Dashboard](https://github.com/ninedata-cloud/dbbench/raw/main/src/main/resources/static/img/main1.heic)
 
 #### Configuration Panel
-![Configuration](src/main/resources/static/img/config1.jpg)
+![Configuration](https://github.com/ninedata-cloud/dbbench/raw/main/src/main/resources/static/img/config2.heic)
 
 ## Docker Quick Start (Recommended) 
 ```bash
