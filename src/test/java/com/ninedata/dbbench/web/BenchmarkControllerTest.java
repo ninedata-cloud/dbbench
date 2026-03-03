@@ -6,6 +6,9 @@ import com.ninedata.dbbench.config.ProfileService;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.MetricsRegistry;
 import com.ninedata.dbbench.metrics.ClientMetricsCollector;
+import com.ninedata.dbbench.web.dto.response.ApiResponse;
+import com.ninedata.dbbench.web.dto.response.BenchmarkStatusResponse;
+import com.ninedata.dbbench.web.dto.response.LoadProgressResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -38,16 +41,13 @@ class BenchmarkControllerTest {
     @Test
     @DisplayName("Should return status")
     void testStatus() {
-        ResponseEntity<Map<String, Object>> response = controller.status();
+        ResponseEntity<BenchmarkStatusResponse> response = controller.status();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().containsKey("status"));
-        assertTrue(response.getBody().containsKey("running"));
-        assertTrue(response.getBody().containsKey("loading"));
-        assertEquals("IDLE", response.getBody().get("status"));
-        assertEquals(false, response.getBody().get("running"));
-        assertEquals(false, response.getBody().get("loading"));
+        assertEquals("IDLE", response.getBody().getStatus());
+        assertFalse(response.getBody().isRunning());
+        assertFalse(response.getBody().isLoading());
     }
 
     @Test
@@ -76,14 +76,12 @@ class BenchmarkControllerTest {
     @Test
     @DisplayName("Should return load progress")
     void testLoadProgress() {
-        ResponseEntity<Map<String, Object>> response = controller.loadProgress();
+        ResponseEntity<LoadProgressResponse> response = controller.loadProgress();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertTrue(response.getBody().containsKey("loading"));
-        assertTrue(response.getBody().containsKey("progress"));
-        assertTrue(response.getBody().containsKey("message"));
-        assertTrue(response.getBody().containsKey("status"));
+        // LoadProgressResponse has loading, progress, message, status fields
+        assertFalse(response.getBody().isLoading());
     }
 
     @Test
@@ -98,32 +96,25 @@ class BenchmarkControllerTest {
     @Test
     @DisplayName("Should clear logs")
     void testClearLogs() {
-        ResponseEntity<Map<String, Object>> response = controller.clearLogs();
+        ResponseEntity<Void> response = controller.clearLogs();
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(true, response.getBody().get("success"));
-        assertEquals("Logs cleared", response.getBody().get("message"));
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
     }
 
     @Test
     @DisplayName("Should stop benchmark gracefully when not running")
     void testStopWhenNotRunning() {
-        ResponseEntity<Map<String, Object>> response = controller.stop();
+        ResponseEntity<ApiResponse<Void>> response = controller.stop();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(true, response.getBody().get("success"));
+        assertTrue(response.getBody().isSuccess());
     }
 
     @Test
-    @DisplayName("Should fail to cancel load when not loading")
+    @DisplayName("Should throw exception when canceling load while not loading")
     void testCancelLoadWhenNotLoading() {
-        ResponseEntity<Map<String, Object>> response = controller.cancelLoad();
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(false, response.getBody().get("success"));
-        assertTrue(response.getBody().get("error").toString().contains("No data loading"));
+        // When no loading is in progress, cancelLoad throws IllegalStateException
+        assertThrows(IllegalStateException.class, () -> controller.cancelLoad());
     }
 }
