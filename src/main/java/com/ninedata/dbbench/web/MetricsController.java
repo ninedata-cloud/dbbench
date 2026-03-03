@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.ninedata.dbbench.metrics.MetricsSnapshot;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,14 +31,32 @@ public class MetricsController {
         response.put("running", engine.isRunning());
         response.put("loading", engine.isLoading());
 
+        // Include database and dbHost metrics from latest snapshot
+        MetricsSnapshot latest = metricsRegistry.getLatestSnapshot();
+        if (latest != null) {
+            if (latest.getDatabaseMetrics() != null && !latest.getDatabaseMetrics().isEmpty()) {
+                response.put("database", latest.getDatabaseMetrics());
+            }
+            if (latest.getDbHostMetrics() != null && !latest.getDbHostMetrics().isEmpty()) {
+                response.put("dbHost", latest.getDbHostMetrics());
+            }
+        }
+
         // Include load progress if loading
         if (engine.isLoading()) {
             response.put("loadProgress", engine.getLoadProgress());
             response.put("loadMessage", engine.getLoadMessage());
         }
 
+        // Include SSH status from engine config
+        Map<String, Object> engineConfig = engine.getConfig();
+        if (engineConfig.containsKey("ssh")) {
+            response.put("ssh", engineConfig.get("ssh"));
+        }
+
         return ResponseEntity.ok(response);
     }
+
     @GetMapping("/history")
     public ResponseEntity<?> history(@RequestParam(defaultValue = "0") int limit) {
         int size = metricsRegistry.getHistorySize();

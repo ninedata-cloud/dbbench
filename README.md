@@ -73,19 +73,19 @@ mvn clean package -DskipTests
 Start the web server (default port 1929):
 
 ```bash
-java -jar target/dbbench-0.9.0.jar
+java -jar target/dbbench-0.9.1.jar
 ```
 
 Specify a custom port using `--port`:
 
 ```bash
-java -jar target/dbbench-0.9.0.jar --port 8080
+java -jar target/dbbench-0.9.1.jar --port 8080
 ```
 
 Or use the `SERVER_PORT` environment variable:
 
 ```bash
-SERVER_PORT=8080 java -jar target/dbbench-0.9.0.jar
+SERVER_PORT=8080 java -jar target/dbbench-0.9.1.jar
 ```
 
 Open http://localhost:1929 (or your custom port) in your browser.
@@ -103,19 +103,19 @@ CLI mode reads all configuration from a profile file (`-f`), the same format use
 
 ```bash
 # Load test data
-java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties load
+java -jar target/dbbench-0.9.1.jar -f profiles/local-mysql.properties load
 
 # Run benchmark (data must be loaded first)
-java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties run
+java -jar target/dbbench-0.9.1.jar -f profiles/local-mysql.properties run
 
 # Clean existing data
-java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties clean
+java -jar target/dbbench-0.9.1.jar -f profiles/local-mysql.properties clean
 
 # Combine actions: clean → load → run
-java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties clean load run
+java -jar target/dbbench-0.9.1.jar -f profiles/local-mysql.properties clean load run
 
 # Override specific settings from config file
-java -jar target/dbbench-0.9.0.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
+java -jar target/dbbench-0.9.1.jar -f profiles/local-mysql.properties -w 20 -c 100 -d 300 run
 ```
 
 ## CLI Options
@@ -172,57 +172,6 @@ benchmark.mix.delivery=4
 benchmark.mix.stock-level=4
 ```
 
-## Docker Environment Variables
-
-All configuration can be overridden via environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SERVER_PORT` | Web server port | 1929 |
-| `DB_TYPE` | Database type | mysql |
-| `DB_JDBC_URL` | JDBC connection URL | jdbc:mysql://... |
-| `DB_USERNAME` | Database username | root |
-| `DB_PASSWORD` | Database password | (empty) |
-| `DB_POOL_SIZE` | Connection pool size | 50 |
-| `BENCHMARK_WAREHOUSES` | Number of warehouses | 10 |
-| `BENCHMARK_TERMINALS` | Concurrent threads | 50 |
-| `BENCHMARK_DURATION` | Test duration (seconds) | 60 |
-| `BENCHMARK_LOAD_CONCURRENCY` | Data loading threads | 4 |
-| `BENCHMARK_LOAD_CONCURRENCY` | Data loading threads | 4 |
-| `BENCHMARK_CSV_LOAD` | Use CSV bulk loading (true/false) | false |
-| `JAVA_OPTS` | JVM options | -Xms512m -Xmx1024m |
-
-## REST API
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/benchmark/config` | GET | Get current configuration |
-| `/api/benchmark/config` | POST | Update configuration |
-| `/api/benchmark/test-connection` | POST | Test database connection |
-| `/api/benchmark/init` | POST | Initialize database connection |
-| `/api/benchmark/load` | POST | Load TPC-C data |
-| `/api/benchmark/clean` | POST | Clean test data |
-| `/api/benchmark/start` | POST | Start benchmark |
-| `/api/benchmark/stop` | POST | Stop benchmark |
-| `/api/benchmark/status` | GET | Get current status |
-| `/api/benchmark/logs` | GET | Get activity logs |
-| `/api/metrics/current` | GET | Get current metrics |
-| `/api/metrics/history` | GET | Get metrics history (default: up to 3600 snapshots) |
-| `/api/metrics/tps-history` | GET | Get tpmC history (default: up to 3600 snapshots) |
-| `/api/metrics/hardware-info` | GET | Get client and DB server hardware info |
-| `/api/report/markdown` | GET | Get benchmark report in Markdown |
-| `/api/report/download/markdown` | GET | Download benchmark report as .md file |
-
-## WebSocket
-
-Connect to `ws://localhost:1929/ws/metrics` for real-time metrics streaming.
-
-Message types:
-- Metrics update: `{ "transaction": {...}, "client": {...}, "database": {...} }`
-- Status change: `{ "type": "status", "status": "RUNNING" }`
-- Progress update: `{ "type": "progress", "progress": 50, "message": "Loading..." }`
-- Log entry: `{ "type": "log", "log": { "level": "INFO", "message": "..." } }`
-
 ## TPC-C Transaction Mix
 
 | Transaction | Default % | Description |
@@ -245,8 +194,6 @@ Message types:
 ### Database Metrics
 - Active connections
 - Buffer pool / Cache hit ratio
-- Row lock waits
-- Slow queries count
 
 ### Database Host Metrics (via SSH)
 - CPU usage (%)

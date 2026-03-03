@@ -923,11 +923,37 @@ async function saveConfig() {
     const dbType = document.getElementById('cfgFormDbType').value;
     const isSqlite = dbType === 'sqlite';
 
+    const transactionMix = {
+        newOrder: parseInt(document.getElementById('cfgFormMixNewOrder').value),
+        payment: parseInt(document.getElementById('cfgFormMixPayment').value),
+        orderStatus: parseInt(document.getElementById('cfgFormMixOrderStatus').value),
+        delivery: parseInt(document.getElementById('cfgFormMixDelivery').value),
+        stockLevel: parseInt(document.getElementById('cfgFormMixStockLevel').value)
+    };
+
+    // SSH config
+    const sshConfig = {
+        enabled: document.getElementById('cfgFormSshEnabled').checked,
+        host: document.getElementById('cfgFormSshHost').value,
+        port: parseInt(document.getElementById('cfgFormSshPort').value) || 22,
+        username: document.getElementById('cfgFormSshUser').value
+    };
+    const sshPass = document.getElementById('cfgFormSshPass').value;
+    if (sshPass) {
+        savedSshPassword = sshPass;
+        sshConfig.password = sshPass;
+    }
+    const sshKey = document.getElementById('cfgFormSshKey').value;
+    if (sshKey) {
+        sshConfig.privateKey = sshKey;
+    }
+
     const newConfig = {
         database: {
             type: dbType,
             jdbcUrl: document.getElementById('cfgFormJdbcUrl').value,
-            username: document.getElementById('cfgFormDbUser').value
+            username: document.getElementById('cfgFormDbUser').value,
+            ssh: sshConfig
         },
         benchmark: {
             warehouses: parseInt(document.getElementById('cfgFormWarehouses').value),
@@ -935,14 +961,8 @@ async function saveConfig() {
             duration: parseInt(document.getElementById('cfgFormDuration').value),
             loadConcurrency: isSqlite ? 1 : parseInt(document.getElementById('cfgFormLoadConcurrency').value),
             thinkTime: document.getElementById('cfgFormThinkTime').checked,
-            loadMode: document.getElementById('cfgFormLoadMode').value
-        },
-        transactionMix: {
-            newOrder: parseInt(document.getElementById('cfgFormMixNewOrder').value),
-            payment: parseInt(document.getElementById('cfgFormMixPayment').value),
-            orderStatus: parseInt(document.getElementById('cfgFormMixOrderStatus').value),
-            delivery: parseInt(document.getElementById('cfgFormMixDelivery').value),
-            stockLevel: parseInt(document.getElementById('cfgFormMixStockLevel').value)
+            loadMode: document.getElementById('cfgFormLoadMode').value,
+            mix: transactionMix
         }
     };
 
@@ -953,30 +973,12 @@ async function saveConfig() {
         newConfig.database.password = password;
     }
 
-    // SSH config
-    const sshEnabled = document.getElementById('cfgFormSshEnabled').checked;
-    newConfig.ssh = {
-        enabled: sshEnabled,
-        host: document.getElementById('cfgFormSshHost').value,
-        port: parseInt(document.getElementById('cfgFormSshPort').value) || 22,
-        username: document.getElementById('cfgFormSshUser').value
-    };
-    const sshPass = document.getElementById('cfgFormSshPass').value;
-    if (sshPass) {
-        savedSshPassword = sshPass;
-        newConfig.ssh.password = sshPass;
-    }
-    const sshKey = document.getElementById('cfgFormSshKey').value;
-    if (sshKey) {
-        newConfig.ssh.privateKey = sshKey;
-    }
-
     // Validate transaction mix
-    const mixTotal = newConfig.transactionMix.newOrder +
-                     newConfig.transactionMix.payment +
-                     newConfig.transactionMix.orderStatus +
-                     newConfig.transactionMix.delivery +
-                     newConfig.transactionMix.stockLevel;
+    const mixTotal = transactionMix.newOrder +
+                     transactionMix.payment +
+                     transactionMix.orderStatus +
+                     transactionMix.delivery +
+                     transactionMix.stockLevel;
 
     if (mixTotal !== 100) {
         showToast('error', 'Invalid Configuration', `Transaction mix must total 100% (currently ${mixTotal}%)`);
@@ -992,18 +994,18 @@ async function saveConfig() {
         const data = await res.json();
 
         if (data.success) {
-            currentConfig = data.config;
+            currentConfig = data.data;
             currentProfileName = document.getElementById('profileSelect').value || 'default';
             displayConfig(currentConfig);
 
-            // Save to current profile
+            // Save to current profile using the engine-normalized config
             const profileName = document.getElementById('profileSelect').value;
             if (profileName && profileName !== 'default') {
                 try {
                     await fetch(`/api/benchmark/profiles/${encodeURIComponent(profileName)}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newConfig)
+                        body: JSON.stringify(currentConfig)
                     });
                 } catch (ignored) {}
             }
@@ -1015,8 +1017,9 @@ async function saveConfig() {
             // Clear connection test result
             document.getElementById('connectionTestResult').innerHTML = '';
         } else {
-            addLog('Failed to save config: ' + data.error, 'error');
-            showToast('error', 'Save Failed', data.error);
+            const errMsg = data.message || data.error || 'Unknown error';
+            addLog('Failed to save config: ' + errMsg, 'error');
+            showToast('error', 'Save Failed', errMsg);
         }
     } catch (e) {
         addLog('Failed to save config: ' + e.message, 'error');
@@ -1160,8 +1163,9 @@ async function apiCall(endpoint, method = 'POST', body = null) {
                 lastStatus = data.status;
             }
         } else {
-            addLog('Error: ' + data.error, 'error');
-            showToast('error', 'Operation Failed', data.error);
+            const errMsg = data.message || data.error || 'Unknown error';
+            addLog('Error: ' + errMsg, 'error');
+            showToast('error', 'Operation Failed', errMsg);
         }
         return data;
     } catch (e) {

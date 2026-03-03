@@ -65,21 +65,6 @@ Each warehouse contains approximately:
 |------|---------|
 | 1929 | Web UI and REST API |
 
-## REST API
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/benchmark/config` | GET/POST | Get/Update configuration |
-| `/api/benchmark/test-connection` | POST | Test database connection |
-| `/api/benchmark/load` | POST | Load test data |
-| `/api/benchmark/start` | POST | Start benchmark |
-| `/api/benchmark/stop` | POST | Stop benchmark |
-| `/api/benchmark/status` | GET | Get current status |
-| `/api/metrics/current` | GET | Get real-time metrics |
-| `/api/metrics/history` | GET | Get metrics history (up to 3600 snapshots) |
-| `/api/metrics/tps-history` | GET | Get TPS history data |
-| `/api/report/markdown` | GET | Get benchmark report (Markdown) |
-
 ## Metrics Collected
 
 ### Transaction Metrics
@@ -98,8 +83,6 @@ Each warehouse contains approximately:
 ### Database Metrics
 - Active connections
 - Buffer pool / Cache hit ratio
-- Row lock waits
-- Slow queries count
 
 ### Client Metrics (Local Machine)
 - CPU usage (%)

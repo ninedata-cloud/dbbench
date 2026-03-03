@@ -7,9 +7,16 @@ import com.ninedata.dbbench.database.DatabaseFactory;
 import com.ninedata.dbbench.database.plugin.DatabaseDefinitionRegistry;
 import com.ninedata.dbbench.engine.BenchmarkEngine;
 import com.ninedata.dbbench.metrics.SshMetricsCollector;
+import com.ninedata.dbbench.web.dto.request.*;
+import com.ninedata.dbbench.web.dto.response.*;
+import com.ninedata.dbbench.web.util.ConfigMapper;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Connection;
@@ -21,139 +28,80 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/benchmark")
 @RequiredArgsConstructor
+@Validated
 public class BenchmarkController {
     private final BenchmarkEngine engine;
     private final DatabaseConfig dbConfig;
     private final ProfileService profileService;
 
     @PostMapping("/init")
-    public ResponseEntity<Map<String, Object>> initialize() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.initialize();
-            response.put("success", true);
-            response.put("message", "Engine initialized");
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to initialize", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> initialize() throws Exception {
+        engine.initialize();
+        return ResponseEntity.ok(
+            ApiResponse.success("Engine initialized", null, engine.getStatus())
+        );
     }
 
     @PostMapping("/load")
-    public ResponseEntity<Map<String, Object>> loadData() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.loadDataAsync();
-            response.put("success", true);
-            response.put("message", "Data loading started");
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to start data loading", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> loadData() throws Exception {
+        engine.loadDataAsync();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(
+            ApiResponse.success("Data loading started", null, engine.getStatus())
+        );
     }
 
     @GetMapping("/load/progress")
-    public ResponseEntity<Map<String, Object>> loadProgress() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("loading", engine.isLoading());
-        response.put("progress", engine.getLoadProgress());
-        response.put("message", engine.getLoadMessage());
-        response.put("status", engine.getStatus());
+    public ResponseEntity<LoadProgressResponse> loadProgress() {
+        LoadProgressResponse response = LoadProgressResponse.builder()
+            .loading(engine.isLoading())
+            .progress(engine.getLoadProgress())
+            .message(engine.getLoadMessage())
+            .status(engine.getStatus())
+            .build();
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/load/cancel")
-    public ResponseEntity<Map<String, Object>> cancelLoad() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.cancelLoad();
-            response.put("success", true);
-            response.put("message", "Data loading cancellation requested");
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to cancel data loading", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> cancelLoad() {
+        engine.cancelLoad();
+        return ResponseEntity.ok(
+            ApiResponse.success("Data loading cancellation requested", null, engine.getStatus())
+        );
     }
 
     @PostMapping("/clean")
-    public ResponseEntity<Map<String, Object>> cleanData() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.cleanData();
-            response.put("success", true);
-            response.put("message", "Data cleaned");
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to clean data", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> cleanData() throws Exception {
+        engine.cleanData();
+        return ResponseEntity.ok(
+            ApiResponse.success("Data cleaned successfully", null, engine.getStatus())
+        );
     }
 
     @PostMapping("/start")
-    public ResponseEntity<Map<String, Object>> start() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.start();
-            response.put("success", true);
-            response.put("message", "Benchmark started");
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to start", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> start() throws Exception {
+        engine.start();
+        return ResponseEntity.ok(
+            ApiResponse.success("Benchmark started", null, engine.getStatus())
+        );
     }
 
     @PostMapping("/stop")
-    public ResponseEntity<Map<String, Object>> stop() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.stop();
-            response.put("success", true);
-            response.put("message", "Benchmark stopped");
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to stop", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> stop() {
+        engine.stop();
+        return ResponseEntity.ok(
+            ApiResponse.success("Benchmark stopped", null, engine.getStatus())
+        );
     }
 
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> status() {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("status", engine.getStatus());
-        response.put("running", engine.isRunning());
-        response.put("loading", engine.isLoading());
-        if (engine.isLoading()) {
-            response.put("loadProgress", engine.getLoadProgress());
-            response.put("loadMessage", engine.getLoadMessage());
-        }
+    public ResponseEntity<BenchmarkStatusResponse> status() {
+        BenchmarkStatusResponse response = BenchmarkStatusResponse.builder()
+            .status(engine.getStatus())
+            .running(engine.isRunning())
+            .loading(engine.isLoading())
+            .loadProgress(engine.isLoading() ? engine.getLoadProgress() : null)
+            .loadMessage(engine.isLoading() ? engine.getLoadMessage() : null)
+            .build();
         return ResponseEntity.ok(response);
     }
 
@@ -168,50 +116,48 @@ public class BenchmarkController {
     }
 
     @PostMapping("/config")
-    public ResponseEntity<Map<String, Object>> updateConfig(@RequestBody Map<String, Object> newConfig) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            engine.updateConfig(newConfig);
-            response.put("success", true);
-            response.put("message", "Configuration updated");
-            response.put("config", engine.getConfig());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to update config", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateConfig(
+            @Valid @RequestBody ConfigUpdateRequest request) {
+        Map<String, Object> configMap = ConfigMapper.toMap(request);
+        engine.updateConfig(configMap);
+        Map<String, Object> updatedConfig = engine.getConfig();
+        return ResponseEntity.ok(
+            ApiResponse.success("Configuration updated", updatedConfig, engine.getStatus())
+        );
     }
 
     /**
      * Test database connection with provided configuration
      */
     @PostMapping("/test-connection")
-    public ResponseEntity<Map<String, Object>> testConnection(@RequestBody Map<String, Object> config) {
-        Map<String, Object> response = new LinkedHashMap<>();
+    public ResponseEntity<ConnectionTestResponse> testConnection(
+            @Valid @RequestBody ConnectionTestRequestWrapper wrapper) {
+        // Support both nested {database: {...}} and flat {...} formats
+        ConnectionTestRequest request = wrapper.getDatabase();
+        if (request == null) {
+            throw new IllegalArgumentException("Database configuration is required");
+        }
+
+        ConnectionTestResponse response = testConnectionInternal(request);
+        HttpStatus status = response.isSuccess()
+            ? HttpStatus.OK
+            : HttpStatus.SERVICE_UNAVAILABLE;
+        return ResponseEntity.status(status).body(response);
+    }
+
+    private ConnectionTestResponse testConnectionInternal(ConnectionTestRequest request) {
         DatabaseAdapter testAdapter = null;
 
         try {
             // Create temporary config for testing
             DatabaseConfig testConfig = new DatabaseConfig();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> db = (Map<String, Object>) config.get("database");
-            if (db == null) {
-                db = config; // Allow direct database config
-            }
-
-            testConfig.setType((String) db.getOrDefault("type", dbConfig.getType()));
-            testConfig.setJdbcUrl((String) db.getOrDefault("jdbcUrl", dbConfig.getJdbcUrl()));
-            testConfig.setUsername((String) db.getOrDefault("username", dbConfig.getUsername()));
+            testConfig.setType(request.getType());
+            testConfig.setJdbcUrl(request.getJdbcUrl());
+            testConfig.setUsername(request.getUsername());
 
             // Use provided password or existing password
-            String password = (String) db.get("password");
-            if (password != null && !password.isEmpty()) {
-                testConfig.setPassword(password);
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+                testConfig.setPassword(request.getPassword());
             } else {
                 testConfig.setPassword(dbConfig.getPassword());
             }
@@ -225,7 +171,6 @@ public class BenchmarkController {
             testAdapter.initialize();
 
             // Try to get a connection and execute a simple query
-            // Use database-specific validation query
             String validationQuery = getValidationQuery(testConfig.getType());
             try (Connection conn = testAdapter.getConnection()) {
                 conn.createStatement().execute(validationQuery);
@@ -233,36 +178,42 @@ public class BenchmarkController {
 
             long elapsed = System.currentTimeMillis() - startTime;
 
-            response.put("success", true);
-            response.put("message", String.format("Connection successful (%dms)", elapsed));
-            response.put("database", testConfig.getType());
-            response.put("jdbcUrl", testConfig.getJdbcUrl());
-            response.put("responseTime", elapsed);
+            return ConnectionTestResponse.builder()
+                .success(true)
+                .message(String.format("Connection successful (%dms)", elapsed))
+                .database(testConfig.getType())
+                .jdbcUrl(testConfig.getJdbcUrl())
+                .responseTime(elapsed)
+                .build();
 
-            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Connection test failed", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
 
             // Provide more specific error messages
             String errorMsg = e.getMessage();
+            String errorType = "UNKNOWN";
+            String suggestion = null;
+
             if (errorMsg != null) {
                 if (errorMsg.contains("Communications link failure") || errorMsg.contains("Connection refused")) {
-                    response.put("errorType", "CONNECTION_REFUSED");
-                    response.put("suggestion", "Check if database server is running and accessible");
+                    errorType = "CONNECTION_REFUSED";
+                    suggestion = "Check if database server is running and accessible";
                 } else if (errorMsg.contains("Access denied")) {
-                    response.put("errorType", "AUTH_FAILED");
-                    response.put("suggestion", "Check username and password");
+                    errorType = "AUTH_FAILED";
+                    suggestion = "Check username and password";
                 } else if (errorMsg.contains("Unknown database")) {
-                    response.put("errorType", "DATABASE_NOT_FOUND");
-                    response.put("suggestion", "Database does not exist, create it first");
-                } else {
-                    response.put("errorType", "UNKNOWN");
+                    errorType = "DATABASE_NOT_FOUND";
+                    suggestion = "Database does not exist, create it first";
                 }
             }
 
-            return ResponseEntity.badRequest().body(response);
+            return ConnectionTestResponse.builder()
+                .success(false)
+                .error(errorMsg)
+                .errorType(errorType)
+                .suggestion(suggestion)
+                .build();
+
         } finally {
             if (testAdapter != null) {
                 try {
@@ -273,35 +224,36 @@ public class BenchmarkController {
     }
 
     @PostMapping("/test-ssh")
-    public ResponseEntity<Map<String, Object>> testSshConnection(@RequestBody Map<String, Object> config) {
-        Map<String, Object> response = new LinkedHashMap<>();
+    public ResponseEntity<SshTestResponse> testSshConnection(@Valid @RequestBody SshTestRequest request) {
         SshMetricsCollector collector = null;
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> sshMap = (Map<String, Object>) config.get("ssh");
-            if (sshMap == null) sshMap = config;
+            SshConfigDto sshDto = request.getSsh();
+            if (sshDto == null) {
+                throw new IllegalArgumentException("SSH configuration is required");
+            }
 
             DatabaseConfig.SshConfig sshCfg = new DatabaseConfig.SshConfig();
             sshCfg.setEnabled(true);
-            sshCfg.setHost((String) sshMap.getOrDefault("host", ""));
-            sshCfg.setPort(((Number) sshMap.getOrDefault("port", 22)).intValue());
-            sshCfg.setUsername((String) sshMap.getOrDefault("username", "root"));
+            sshCfg.setHost(sshDto.getHost() != null ? sshDto.getHost() : "");
+            sshCfg.setPort(sshDto.getPort() != null ? sshDto.getPort() : 22);
+            sshCfg.setUsername(sshDto.getUsername() != null ? sshDto.getUsername() : "root");
 
-            String password = (String) sshMap.get("password");
-            if (password != null && !password.isEmpty()) {
-                sshCfg.setPassword(password);
+            if (sshDto.getPassword() != null && !sshDto.getPassword().isEmpty()) {
+                sshCfg.setPassword(sshDto.getPassword());
             } else {
                 sshCfg.setPassword(dbConfig.getSsh().getPassword());
             }
-            String privateKey = (String) sshMap.get("privateKey");
-            if (privateKey != null && !privateKey.isEmpty()) {
-                sshCfg.setPrivateKey(privateKey);
+            if (sshDto.getPrivateKey() != null && !sshDto.getPrivateKey().isEmpty()) {
+                sshCfg.setPrivateKey(sshDto.getPrivateKey());
             }
 
             // Resolve effective host
             String host = sshCfg.getHost();
             if (host == null || host.isBlank()) {
-                String jdbcUrl = (String) ((Map<String, Object>) config.getOrDefault("database", Map.of())).getOrDefault("jdbcUrl", dbConfig.getJdbcUrl());
+                DatabaseConfigDto dbDto = request.getDatabase();
+                String jdbcUrl = (dbDto != null && dbDto.getJdbcUrl() != null)
+                    ? dbDto.getJdbcUrl()
+                    : dbConfig.getJdbcUrl();
                 DatabaseConfig tmpCfg = new DatabaseConfig();
                 tmpCfg.setJdbcUrl(jdbcUrl);
                 tmpCfg.setSsh(sshCfg);
@@ -313,16 +265,24 @@ public class BenchmarkController {
             collector.connect();
             long elapsed = System.currentTimeMillis() - startTime;
 
-            response.put("success", true);
-            response.put("message", String.format("SSH connection successful (%dms)", elapsed));
-            response.put("host", host);
-            response.put("port", sshCfg.getPort());
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(
+                SshTestResponse.builder()
+                    .success(true)
+                    .message(String.format("SSH connection successful (%dms)", elapsed))
+                    .host(host)
+                    .port(sshCfg.getPort())
+                    .responseTime(elapsed)
+                    .build()
+            );
         } catch (Exception e) {
             log.error("SSH connection test failed", e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                SshTestResponse.builder()
+                    .success(false)
+                    .message("SSH connection failed")
+                    .error(e.getMessage())
+                    .build()
+            );
         } finally {
             if (collector != null) {
                 collector.disconnect();
@@ -354,19 +314,17 @@ public class BenchmarkController {
     }
 
     @GetMapping("/logs")
-    public ResponseEntity<?> logs(@RequestParam(defaultValue = "100") int limit) {
+    public ResponseEntity<List<Map<String, Object>>> logs(
+            @RequestParam(defaultValue = "100") @Min(1) int limit) {
         var logs = engine.getLogHistory();
         int start = Math.max(0, logs.size() - limit);
         return ResponseEntity.ok(logs.subList(start, logs.size()));
     }
 
     @DeleteMapping("/logs")
-    public ResponseEntity<Map<String, Object>> clearLogs() {
-        Map<String, Object> response = new LinkedHashMap<>();
+    public ResponseEntity<Void> clearLogs() {
         engine.clearLogs();
-        response.put("success", true);
-        response.put("message", "Logs cleared");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.noContent().build();
     }
 
     // ==================== Profile Management ====================
@@ -377,69 +335,40 @@ public class BenchmarkController {
     }
 
     @GetMapping("/profiles/{name}")
-    public ResponseEntity<Map<String, Object>> loadProfile(@PathVariable String name) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            Map<String, Object> config = profileService.loadProfile(name);
-            response.put("success", true);
-            response.put("config", config);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to load profile: {}", name, e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ProfileResponse> loadProfile(@PathVariable String name) throws Exception {
+        Map<String, Object> config = profileService.loadProfile(name);
+        return ResponseEntity.ok(
+            ProfileResponse.builder()
+                .success(true)
+                .config(config)
+                .build()
+        );
     }
 
     @PostMapping("/profiles/{name}")
-    public ResponseEntity<Map<String, Object>> saveProfile(@PathVariable String name, @RequestBody Map<String, Object> config) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            profileService.saveProfile(name, config);
-            response.put("success", true);
-            response.put("message", "Profile saved: " + name);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to save profile: {}", name, e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> saveProfile(
+            @PathVariable String name,
+            @RequestBody Map<String, Object> config) throws Exception {
+        profileService.saveProfile(name, config);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            ApiResponse.success("Profile saved: " + name, null)
+        );
     }
 
     @DeleteMapping("/profiles/{name}")
-    public ResponseEntity<Map<String, Object>> deleteProfile(@PathVariable String name) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            profileService.deleteProfile(name);
-            response.put("success", true);
-            response.put("message", "Profile deleted: " + name);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to delete profile: {}", name, e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteProfile(@PathVariable String name) throws Exception {
+        profileService.deleteProfile(name);
+        return ResponseEntity.ok(
+            ApiResponse.success("Profile deleted: " + name, null)
+        );
     }
 
     @PostMapping("/profiles/{name}/apply")
-    public ResponseEntity<Map<String, Object>> applyProfile(@PathVariable String name) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        try {
-            Map<String, Object> config = profileService.loadProfile(name);
-            engine.updateConfig(config);
-            response.put("success", true);
-            response.put("message", "Profile applied: " + name);
-            response.put("config", engine.getConfig());
-            response.put("status", engine.getStatus());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to apply profile: {}", name, e);
-            response.put("success", false);
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<ApiResponse<Map<String, Object>>> applyProfile(@PathVariable String name) throws Exception {
+        Map<String, Object> config = profileService.loadProfile(name);
+        engine.updateConfig(config);
+        return ResponseEntity.ok(
+            ApiResponse.success("Profile applied: " + name, engine.getConfig(), engine.getStatus())
+        );
     }
 }

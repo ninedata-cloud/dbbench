@@ -146,6 +146,12 @@ public class MetricsRegistry {
         history.add(snapshot);
     }
 
+    public MetricsSnapshot getLatestSnapshot() {
+        synchronized (history) {
+            return history.isEmpty() ? null : history.get(history.size() - 1);
+        }
+    }
+
     public List<MetricsSnapshot> getHistorySlice(int start, int end) {
         synchronized (history) {
             int size = history.size();
