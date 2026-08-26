@@ -25,12 +25,17 @@ public class DeliveryTransaction extends AbstractTransaction {
         int delivered = 0;
 
         for (int d = 1; d <= TPCCUtil.DISTRICTS_PER_WAREHOUSE; d++) {
-            // Find oldest undelivered order using optimistic concurrency (BenchmarkSQL approach):
-            // SELECT without FOR UPDATE / LIMIT, then attempt DELETE.
+            // Find the oldest undelivered order using optimistic concurrency
+            // (BenchmarkSQL approach): read one candidate without FOR UPDATE,
+            // then attempt DELETE.  Bounding the result is essential: JDBC
+            // drivers commonly buffer the complete result set before
+            // executeQuery() returns, while this transaction consumes only
+            // rs.next().  Without LIMIT/TOP/FETCH FIRST, a growing backlog is
+            // needlessly scanned and transferred on every delivery.
             // If DELETE returns 0 (concurrent delivery took it), retry next row.
             int orderId = -1;
-            PreparedStatement selectPs = ctx.prepareStatement(
-                "SELECT no_o_id FROM new_order WHERE no_w_id = ? AND no_d_id = ? ORDER BY no_o_id ASC");
+            PreparedStatement selectPs = ctx.prepareStatement(buildSelectFirstRowQuery(
+                "SELECT no_o_id FROM new_order WHERE no_w_id = ? AND no_d_id = ? ORDER BY no_o_id ASC"));
             PreparedStatement deletePs = ctx.prepareStatement(
                 "DELETE FROM new_order WHERE no_w_id = ? AND no_d_id = ? AND no_o_id = ?");
 

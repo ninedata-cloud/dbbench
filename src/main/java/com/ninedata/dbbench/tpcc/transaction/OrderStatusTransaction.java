@@ -52,15 +52,29 @@ public class OrderStatusTransaction extends AbstractTransaction {
 
         // Get last order
         int orderId;
-        String sql = buildSelectFirstRowQuery(
-            "SELECT o_id, o_entry_d, o_carrier_id FROM oorder WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ? ORDER BY o_id DESC");
-        ps = ctx.prepareStatement(sql);
+        ps = ctx.prepareStatement(
+            "SELECT MAX(o_id) FROM oorder WHERE o_w_id = ? AND o_d_id = ? AND o_c_id = ?");
         ps.setInt(1, warehouseId);
         ps.setInt(2, districtId);
         ps.setInt(3, customerId);
         rs = ps.executeQuery();
         if (!rs.next()) return false;
         orderId = rs.getInt(1);
+        if (rs.wasNull()) {
+            rs.close();
+            return false;
+        }
+        rs.close();
+
+        // Read the same order-header fields required by ORDER_STATUS after
+        // resolving the latest id through the customer/order index.
+        ps = ctx.prepareStatement(
+            "SELECT o_entry_d, o_carrier_id FROM oorder WHERE o_w_id = ? AND o_d_id = ? AND o_id = ?");
+        ps.setInt(1, warehouseId);
+        ps.setInt(2, districtId);
+        ps.setInt(3, orderId);
+        rs = ps.executeQuery();
+        if (!rs.next()) return false;
         rs.close();
 
         // Get order lines

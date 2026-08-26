@@ -28,6 +28,8 @@ public class NewOrderTransaction extends AbstractTransaction {
         int[] itemIds = new int[orderLineCount];
         int[] supplyWIds = new int[orderLineCount];
         int[] quantities = new int[orderLineCount];
+        double[] orderLineAmounts = new double[orderLineCount];
+        String[] orderLineDistInfos = new String[orderLineCount];
         boolean allLocal = true;
 
         for (int i = 0; i < orderLineCount; i++) {
@@ -128,7 +130,6 @@ public class NewOrderTransaction extends AbstractTransaction {
             iPrice = rs.getDouble(1);
             rs.close();
 
-            // Get and update stock
             int sQuantity;
             String sDistInfo;
             String stockSql = buildSelectForUpdateQuery("SELECT s_quantity, s_dist_" + String.format("%02d", districtId) + ", s_data FROM stock WHERE s_w_id = ? AND s_i_id = ?");
@@ -143,7 +144,6 @@ public class NewOrderTransaction extends AbstractTransaction {
 
             int newQuantity = sQuantity - quantities[i];
             if (newQuantity < 10) newQuantity += 91;
-
             boolean isRemote = supplyWIds[i] != warehouseId;
             if (isRemote) {
                 ps = ctx.prepareStatement("UPDATE stock SET s_quantity = ?, s_ytd = s_ytd + ?, s_order_cnt = s_order_cnt + 1, s_remote_cnt = s_remote_cnt + 1 WHERE s_w_id = ? AND s_i_id = ?");
@@ -156,9 +156,20 @@ public class NewOrderTransaction extends AbstractTransaction {
             ps.setInt(4, itemIds[i]);
             ps.executeUpdate();
 
-            // Insert order line
-            double olAmount = quantities[i] * iPrice;
-            ps = ctx.prepareStatement("INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)");
+            // Keep row values locally until every item/stock operation has
+            // succeeded.  This avoids leaving pending JDBC batch entries when
+            // the transaction deliberately rolls back on an invalid item.
+            orderLineAmounts[i] = quantities[i] * iPrice;
+            orderLineDistInfos[i] = sDistInfo;
+        }
+
+        // One order contains 5-15 independent order_line INSERTs. Submit them
+        // as one JDBC batch so rewriteBatchedStatements can emit a multi-row
+        // INSERT and databases can use their normal batch heap/index path.
+        // The transaction boundary and rollback semantics are unchanged.
+        ps = ctx.prepareStatement("INSERT INTO order_line (ol_o_id, ol_d_id, ol_w_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)");
+        ps.clearBatch();
+        for (int i = 0; i < orderLineCount; i++) {
             ps.setInt(1, orderId);
             ps.setInt(2, districtId);
             ps.setInt(3, warehouseId);
@@ -166,10 +177,11 @@ public class NewOrderTransaction extends AbstractTransaction {
             ps.setInt(5, itemIds[i]);
             ps.setInt(6, supplyWIds[i]);
             ps.setInt(7, quantities[i]);
-            ps.setDouble(8, olAmount);
-            ps.setString(9, sDistInfo);
-            ps.executeUpdate();
+            ps.setDouble(8, orderLineAmounts[i]);
+            ps.setString(9, orderLineDistInfos[i]);
+            ps.addBatch();
         }
+        ps.executeBatch();
 
         return true;
     }

@@ -22,21 +22,31 @@ import java.util.stream.Stream;
 @Component
 public class DatabaseDefinitionRegistry {
 
-    private static DatabaseDefinitionRegistry instance;
+    private static volatile DatabaseDefinitionRegistry instance;
 
     private final Map<String, DatabaseDefinition> definitions = new ConcurrentHashMap<>();
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
 
     @PostConstruct
     public void init() {
-        instance = this;
         scanExternalDefinitions();
         scanClasspathDefinitions();
+        instance = this;
         log.info("Database plugin registry initialized: {} definitions loaded", definitions.size());
     }
 
     public static DatabaseDefinitionRegistry getInstance() {
-        return instance;
+        DatabaseDefinitionRegistry current = instance;
+        if (current == null) {
+            synchronized (DatabaseDefinitionRegistry.class) {
+                current = instance;
+                if (current == null) {
+                    current = new DatabaseDefinitionRegistry();
+                    current.init();
+                }
+            }
+        }
+        return current;
     }
 
     private void scanExternalDefinitions() {
